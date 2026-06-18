@@ -59,10 +59,11 @@ def fetch_page(
             only; ignored when the server runs over HTTP). Defaults to the
             WEBEXTRACT_PROFILE env var if set.
         max_items: Cap on list-like content such as comments.
-        scroll: Load more lazily-rendered content (e.g. additional Reddit
-            comments) up to max_items by scrolling and expanding "more replies".
-            Implies use_browser. Slower; use when you need more than the first
-            page of comments/items.
+        scroll: Load more lazily-rendered content by scrolling to the bottom
+            until the page stops growing. On sites with a dedicated extractor
+            (e.g. Reddit) it also expands "more replies" and stops at max_items.
+            Implies use_browser. Slower; use for infinite-scroll pages or when
+            you need more than the first page of comments/items.
 
     Returns:
         Readable page content as markdown (text, with links/images as references).

@@ -217,12 +217,23 @@ def firefox_page_source(
     """Render a URL in Firefox and return (page_source, 'text/html').
 
     Waits (up to opts.wait) until `ready_js` is truthy rather than sleeping a
-    fixed time, so it returns as soon as the page is ready.
+    fixed time, so it returns as soon as the page is ready. If `opts.scroll` is
+    set, scrolls to the bottom repeatedly to trigger infinite-scroll / lazy
+    loading until the page stops growing.
     """
     validate_public_url(url)
     with firefox_session(opts) as driver:
         driver.get(url)
         _await_ready(driver, ready_js, opts.wait)
+        if opts.scroll:
+            # No per-item selector on an arbitrary page, so use the page height
+            # as the growth signal: keep scrolling while new content extends it.
+            _scroll_for_more(
+                driver,
+                "return document.body.scrollHeight;",
+                target=2**31,  # unreachable: stop only when height stops growing
+                round_timeout=min(opts.wait, 6),
+            )
         return driver.page_source, "text/html"
 
 
