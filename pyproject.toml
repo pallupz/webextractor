@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "webextract"
+version = "0.1.0"
+description = "Extract readable content (text + media references) from webpages"
+readme = "webextract/README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "selenium>=4.10",
+]
+
+[project.optional-dependencies]
+# Plain-HTTP extraction works with no third-party deps; selenium is only
+# needed for --firefox / --profile (JS rendering, bot-blocked pages).
+dev = []
+
+[project.scripts]
+webextract = "webextract.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["webextract"]
