@@ -35,8 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--scroll", action="store_true",
-        help="scroll to load more lazy-loaded content (e.g. Reddit comments), "
-        "up to --max-items",
+        help="scroll to load lazy/infinite-scroll content (implies --firefox); "
+        "on Reddit also expands replies up to --max-items",
     )
     ap.add_argument(
         "--wait", type=float, default=15.0,
@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("the following argument is required: url")
 
     opts = FetchOptions(
-        firefox=args.firefox,
+        firefox=args.firefox or args.scroll,  # scrolling needs a real browser
         headless=args.headless,
         profile=args.profile,
         wait=args.wait,

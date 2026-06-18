@@ -22,6 +22,11 @@ from . import extract, get_extractor
 # (e.g. WEBEXTRACT_PROFILE=logged-in). Only meaningful for local servers.
 DEFAULT_PROFILE = os.environ.get("WEBEXTRACT_PROFILE") or None
 
+# Set true when serving over HTTP. A remote caller must not be able to drive the
+# server's logged-in Firefox profiles (cookie/session exfiltration), so the
+# profile argument and WEBEXTRACT_PROFILE are ignored in that mode.
+_REMOTE = False
+
 mcp = FastMCP(
     "webextract",
     instructions=(
@@ -51,20 +56,24 @@ def fetch_page(
         use_browser: Render in a real Firefox (runs JavaScript, bypasses many
             bot blocks). Needed for JS-heavy or blocked sites such as Reddit.
         profile: Name of a logged-in Firefox profile to reuse (local servers
-            only). Defaults to the WEBEXTRACT_PROFILE env var if set.
+            only; ignored when the server runs over HTTP). Defaults to the
+            WEBEXTRACT_PROFILE env var if set.
         max_items: Cap on list-like content such as comments.
-        scroll: Load more lazily-rendered content (e.g. additional Reddit
-            comments) up to max_items by scrolling and expanding "more replies".
-            Implies use_browser. Slower; use when you need more than the first
-            page of comments/items.
+        scroll: Load more lazily-rendered content by scrolling to the bottom
+            until the page stops growing. On sites with a dedicated extractor
+            (e.g. Reddit) it also expands "more replies" and stops at max_items.
+            Implies use_browser. Slower; use for infinite-scroll pages or when
+            you need more than the first page of comments/items.
 
     Returns:
         Readable page content as markdown (text, with links/images as references).
     """
+    # Never honor a caller-supplied (or env) profile when reachable remotely.
+    effective_profile = None if _REMOTE else (profile or DEFAULT_PROFILE)
     data = extract(
         url,
         firefox=use_browser or scroll,
-        profile=(profile or DEFAULT_PROFILE),
+        profile=effective_profile,
         max_items=max_items,
         scroll=scroll,
     )
@@ -84,6 +93,8 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.http:
+        global _REMOTE
+        _REMOTE = True
         mcp.settings.host = args.host
         mcp.settings.port = args.port
         mcp.run(transport="streamable-http")

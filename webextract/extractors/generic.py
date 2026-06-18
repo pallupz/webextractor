@@ -6,6 +6,8 @@ markdown references. Use opts.firefox for JS-heavy or bot-blocked pages.
 
 from __future__ import annotations
 
+from urllib.error import HTTPError
+
 from ..base import Extractor, FetchOptions, register
 from ..fetch import firefox_page_source, http_get
 from ..markdown import html_to_markdown
@@ -23,7 +25,16 @@ class GenericExtractor(Extractor):
         if opts.use_browser:
             html, content_type = firefox_page_source(url, opts)
         else:
-            html, content_type = http_get(url)
+            try:
+                html, content_type = http_get(url)
+            except HTTPError as e:
+                if e.code in (401, 403, 405, 406, 429) or e.code >= 500:
+                    raise RuntimeError(
+                        f"plain HTTP fetch was blocked (HTTP {e.code}); "
+                        "retry with use_browser=true (--firefox) to render in a "
+                        "real browser"
+                    ) from e
+                raise
         title, text = html_to_markdown(html)
         return {
             "type": "webpage",
