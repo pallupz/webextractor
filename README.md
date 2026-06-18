@@ -81,6 +81,21 @@ The "fallback" behavior is driven by the tool description, not enforced by the
 protocol. Reinforce it in your client/project instructions if needed, e.g.
 "When web fetch fails or is blocked, call webextract's fetch_page."
 
+### Removing
+
+**Claude Code:**
+
+```bash
+claude mcp remove webextract -s user
+```
+
+**Claude Desktop** - delete the `webextract` entry from `mcpServers` in
+`~/Library/Application Support/Claude/claude_desktop_config.json` (remove the
+whole `mcpServers` block if it is the only server), then restart Claude Desktop.
+
+**ChatGPT** - remove the connector in ChatGPT settings and stop the tunnel /
+`webextract-mcp --http` process.
+
 ## Architecture
 
 - `webextract/base.py` - `Extractor` base class, `FetchOptions`, and the registry.
