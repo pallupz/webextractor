@@ -77,11 +77,25 @@ claude mcp add webextract -s user \
 tunnel to your own Mac is what keeps the logged-in Firefox profile usable;
 a cloud host would only do plain-HTTP and browser fetches without your login.
 
-The "fallback" behavior is driven by the tool description, not enforced by the
-protocol. Reinforce it in your client/project instructions if needed, e.g.
-"When web fetch fails or is blocked, call webextract's fetch_page."
+### Fallback instruction (per client)
 
-### Removing
+The "fallback" behavior is driven by the tool description, not enforced by the
+protocol, so reinforce it in each client's instructions:
+
+> When a web fetch/browse fails, is blocked (HTTP 403/429), times out, or
+> returns empty or JavaScript-only content, fall back to the `webextract` MCP
+> server's `fetch_page` tool. Pass `use_browser=true` for JavaScript-heavy or
+> bot-blocked sites (e.g. Reddit).
+
+- **Claude Code:** add the line to `~/.claude/CLAUDE.md` (global) or a
+  project `CLAUDE.md`. Remove it by deleting the line.
+- **Claude Desktop:** instructions are account-level, not a local file. Add it
+  in the app: Settings -> Profile -> "What personal preferences should Claude
+  consider in responses?". Remove it by deleting the text from that same field.
+  (Cowork / Claude Code sessions launched from Desktop already inherit the
+  global `~/.claude/CLAUDE.md`.)
+
+### Removing the server
 
 **Claude Code:**
 
