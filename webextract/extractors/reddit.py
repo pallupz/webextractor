@@ -80,6 +80,16 @@ return {
 """
 
 
+# Ready when the post has rendered AND (it has no comments OR the comment
+# section has hydrated). Survives Reddit's JS challenge, which delays render.
+_REDDIT_READY = (
+    "const p = document.querySelector('shreddit-post');"
+    "if (!p) return false;"
+    "const cc = parseInt(p.getAttribute('comment-count')) || 0;"
+    "return cc === 0 || document.querySelector('shreddit-comment') != null;"
+)
+
+
 @register
 class RedditExtractor(Extractor):
     name = "reddit"
@@ -96,7 +106,7 @@ class RedditExtractor(Extractor):
     # -- Firefox / rendered DOM (preferred) -------------------------------- #
 
     def _extract_dom(self, url: str, opts: FetchOptions) -> dict:
-        data = firefox_execute(url, opts, _REDDIT_DOM_SCRIPT)
+        data = firefox_execute(url, opts, _REDDIT_DOM_SCRIPT, ready_js=_REDDIT_READY)
         if not data or not data.get("title"):
             raise RuntimeError("could not find post content in rendered page")
         permalink = data.get("permalink") or ""

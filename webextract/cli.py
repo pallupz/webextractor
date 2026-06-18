@@ -34,8 +34,8 @@ def main(argv: list[str] | None = None) -> int:
         help="cap for list-like content such as comments (default 50)",
     )
     ap.add_argument(
-        "--wait", type=float, default=4.0,
-        help="seconds to wait for JS to render in Firefox (default 4)",
+        "--wait", type=float, default=15.0,
+        help="max seconds to wait for JS content to render in Firefox (default 15)",
     )
     ap.add_argument(
         "--list-extractors", action="store_true",

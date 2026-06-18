@@ -8,7 +8,6 @@ requests. It can also reuse a logged-in Firefox profile.
 from __future__ import annotations
 
 import os
-import time
 import urllib.request
 from contextlib import contextmanager
 
@@ -137,19 +136,51 @@ def firefox_session(opts: FetchOptions):
         driver.quit()
 
 
-def firefox_page_source(url: str, opts: FetchOptions) -> tuple[str, str]:
-    """Render a URL in Firefox and return (page_source, 'text/html')."""
+# JS predicate for a generic page: the initial document has finished loading.
+GENERIC_READY = "return document.readyState === 'complete';"
+
+
+def _await_ready(driver, ready_js: str, timeout: float) -> None:
+    """Wait until `ready_js` returns truthy, capped at `timeout` seconds.
+
+    Returns silently on timeout so the caller can still use whatever loaded
+    (the extractor surfaces a clean error if the content never appeared).
+    """
+    from selenium.common.exceptions import TimeoutException
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    try:
+        WebDriverWait(driver, timeout, poll_frequency=0.25).until(
+            lambda d: d.execute_script(ready_js)
+        )
+    except TimeoutException:
+        pass
+
+
+def firefox_page_source(
+    url: str, opts: FetchOptions, ready_js: str = GENERIC_READY
+) -> tuple[str, str]:
+    """Render a URL in Firefox and return (page_source, 'text/html').
+
+    Waits (up to opts.wait) until `ready_js` is truthy rather than sleeping a
+    fixed time, so it returns as soon as the page is ready.
+    """
     with firefox_session(opts) as driver:
         driver.get(url)
-        if opts.wait:
-            time.sleep(opts.wait)
+        _await_ready(driver, ready_js, opts.wait)
         return driver.page_source, "text/html"
 
 
-def firefox_execute(url: str, opts: FetchOptions, script: str):
-    """Render a URL in Firefox and return the result of `script`."""
+def firefox_execute(
+    url: str, opts: FetchOptions, script: str, ready_js: str | None = None
+):
+    """Render a URL in Firefox and return the result of `script`.
+
+    If `ready_js` is given, waits (up to opts.wait) until it is truthy before
+    running `script` - e.g. until the target content has rendered.
+    """
     with firefox_session(opts) as driver:
         driver.get(url.split("?")[0])
-        if opts.wait:
-            time.sleep(opts.wait)
+        if ready_js:
+            _await_ready(driver, ready_js, opts.wait)
         return driver.execute_script(script)

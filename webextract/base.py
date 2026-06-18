@@ -16,7 +16,7 @@ class FetchOptions:
     firefox: bool = False          # render via a real Firefox (Selenium)
     headless: bool = True          # run that Firefox headless
     profile: str | None = None     # Firefox profile name/path (implies firefox)
-    wait: float = 4.0              # seconds to wait for JS to render
+    wait: float = 15.0             # max seconds to wait for JS content to render
     max_items: int = 50            # cap for list-like content (e.g. comments)
 
     @property
