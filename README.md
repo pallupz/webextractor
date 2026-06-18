@@ -34,6 +34,53 @@ data = extract("https://www.reddit.com/r/.../", profile="logged-in")
 Options: `--firefox`, `--profile NAME`, `--no-headless`, `--max-items N`,
 `--wait SECONDS`, `--json`.
 
+## MCP server
+
+Exposes a `fetch_page` tool so an AI client can use this as a fallback when its
+own web fetch fails or is blocked. Install the extra and run:
+
+```bash
+.venv/bin/pip install -e ".[mcp]"
+webextract-mcp                 # stdio (Claude Desktop, Claude Code)
+webextract-mcp --http          # streamable HTTP at http://127.0.0.1:8000/mcp
+```
+
+Set `WEBEXTRACT_PROFILE=logged-in` in the server env to default the Firefox
+profile (local servers only).
+
+**Claude Code** (stdio):
+
+```bash
+claude mcp add webextract -s user \
+  -e WEBEXTRACT_PROFILE=logged-in \
+  -- /Users/pallupz/personal/webextractor/.venv/bin/webextract-mcp
+```
+
+**Claude Desktop** - add to
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "webextract": {
+      "command": "/Users/pallupz/personal/webextractor/.venv/bin/webextract-mcp",
+      "env": { "WEBEXTRACT_PROFILE": "logged-in" }
+    }
+  }
+}
+```
+
+**ChatGPT** - only talks to remote MCP servers over HTTPS, so run
+`webextract-mcp --http` and expose it with a tunnel (e.g.
+`cloudflared tunnel --url http://localhost:8000`), then add
+`https://<tunnel-host>/mcp` as a custom connector (developer mode). Note: a
+tunnel to your own Mac is what keeps the logged-in Firefox profile usable;
+a cloud host would only do plain-HTTP and browser fetches without your login.
+
+The "fallback" behavior is driven by the tool description, not enforced by the
+protocol. Reinforce it in your client/project instructions if needed, e.g.
+"When web fetch fails or is blocked, call webextract's fetch_page."
+
 ## Architecture
 
 - `webextract/base.py` - `Extractor` base class, `FetchOptions`, and the registry.
