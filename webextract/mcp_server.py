@@ -39,6 +39,7 @@ def fetch_page(
     use_browser: bool = False,
     profile: str = "",
     max_items: int = 50,
+    scroll: bool = False,
 ) -> str:
     """Fetch a web page and return its readable content as markdown.
 
@@ -52,15 +53,20 @@ def fetch_page(
         profile: Name of a logged-in Firefox profile to reuse (local servers
             only). Defaults to the WEBEXTRACT_PROFILE env var if set.
         max_items: Cap on list-like content such as comments.
+        scroll: Load more lazily-rendered content (e.g. additional Reddit
+            comments) up to max_items by scrolling and expanding "more replies".
+            Implies use_browser. Slower; use when you need more than the first
+            page of comments/items.
 
     Returns:
         Readable page content as markdown (text, with links/images as references).
     """
     data = extract(
         url,
-        firefox=use_browser,
+        firefox=use_browser or scroll,
         profile=(profile or DEFAULT_PROFILE),
         max_items=max_items,
+        scroll=scroll,
     )
     return get_extractor(url).render(data)
 
