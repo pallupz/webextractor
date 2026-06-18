@@ -105,7 +105,7 @@ class RedditExtractor(Extractor):
     priority = 100
 
     def matches(self, url: str) -> bool:
-        return re.search(r"https?://(\w+\.)?reddit\.com/", url) is not None
+        return re.search(r"https?://(\w+\.)?reddit\.com(/|$)", url) is not None
 
     def extract(self, url: str, opts: FetchOptions) -> dict:
         if opts.use_browser:
@@ -115,8 +115,10 @@ class RedditExtractor(Extractor):
     # -- Firefox / rendered DOM (preferred) -------------------------------- #
 
     def _extract_dom(self, url: str, opts: FetchOptions) -> dict:
+        # Drop the query string: Reddit's sort/context params don't change the
+        # shreddit DOM we read, and a bare permalink renders most reliably.
         data = firefox_execute(
-            url, opts, _REDDIT_DOM_SCRIPT,
+            url.split("?")[0], opts, _REDDIT_DOM_SCRIPT,
             ready_js=_REDDIT_READY,
             scroll_count_js="return document.querySelectorAll('shreddit-comment').length;",
             scroll_target=opts.max_items,

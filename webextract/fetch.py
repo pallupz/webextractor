@@ -274,10 +274,13 @@ def firefox_execute(
     running `script`. If `opts.scroll` and `scroll_count_js` are set, scrolls
     (and runs `scroll_more_js` to click load-more controls) to load lazy content
     up to `scroll_target` items first.
+
+    `url` is loaded as given; callers that want query-string normalization do it
+    before calling.
     """
     validate_public_url(url)
     with firefox_session(opts) as driver:
-        driver.get(url.split("?")[0])
+        driver.get(url)
         if ready_js:
             _await_ready(driver, ready_js, opts.wait)
         if opts.scroll and scroll_count_js:
