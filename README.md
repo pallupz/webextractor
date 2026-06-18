@@ -70,6 +70,11 @@ claude mcp add webextract -s user \
 }
 ```
 
+Important: **fully quit Claude Desktop (Cmd+Q) before editing this file**, then
+reopen it. The app holds the config in memory and rewrites it on quit/launch,
+so an edit made while it is running gets overwritten. (Or use the app's
+Settings -> Developer -> Edit Config, which reloads safely.)
+
 **ChatGPT** - only talks to remote MCP servers over HTTPS, so run
 `webextract-mcp --http` and expose it with a tunnel (e.g.
 `cloudflared tunnel --url http://localhost:8000`), then add
@@ -103,9 +108,10 @@ protocol, so reinforce it in each client's instructions:
 claude mcp remove webextract -s user
 ```
 
-**Claude Desktop** - delete the `webextract` entry from `mcpServers` in
+**Claude Desktop** - quit Claude Desktop first (see note above), then delete the
+`webextract` entry from `mcpServers` in
 `~/Library/Application Support/Claude/claude_desktop_config.json` (remove the
-whole `mcpServers` block if it is the only server), then restart Claude Desktop.
+whole `mcpServers` block if it is the only server), then reopen Claude Desktop.
 
 **ChatGPT** - remove the connector in ChatGPT settings and stop the tunnel /
 `webextract-mcp --http` process.
