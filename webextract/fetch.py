@@ -7,9 +7,12 @@ requests. It can also reuse a logged-in Firefox profile.
 
 from __future__ import annotations
 
+import ipaddress
 import os
+import socket
 import urllib.request
 from contextlib import contextmanager
+from urllib.parse import urlsplit
 
 from .base import FetchOptions
 
@@ -26,8 +29,48 @@ FIREFOX_BASE = os.path.expanduser("~/Library/Application Support/Firefox")
 # Plain HTTP
 # --------------------------------------------------------------------------- #
 
+def _is_private_host(host: str) -> bool:
+    """True if `host` resolves to a private, loopback, or link-local address.
+
+    Blocks the obvious SSRF targets (localhost, RFC1918, cloud metadata at
+    169.254.169.254). Resolution failures are treated as private (fail closed).
+    """
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return True
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr.split("%", 1)[0])
+        except ValueError:
+            continue
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return True
+    return False
+
+
+def validate_public_url(url: str) -> None:
+    """Reject anything that isn't a plain http(s) request to a public host.
+
+    `urllib` happily opens file:// and ftp:// and will reach internal hosts, so
+    callers that fetch arbitrary user-supplied URLs (the MCP tool) gate on this.
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError(
+            f"unsupported URL scheme {parts.scheme!r}: only http/https are allowed"
+        )
+    if not parts.hostname:
+        raise ValueError("URL has no host")
+    if _is_private_host(parts.hostname):
+        raise ValueError(f"refusing to fetch private/internal host: {parts.hostname}")
+
+
 def http_get(url: str, accept: str = "text/html") -> tuple[str, str]:
     """Fetch a URL and return (body_text, content_type)."""
+    validate_public_url(url)
     req = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept": accept}
     )
@@ -132,6 +175,10 @@ def firefox_session(opts: FetchOptions):
 
     quit() runs in a finally and is guarded so a failed teardown never masks the
     original error or leaves the caller without cleanup.
+
+    Each call launches a fresh browser. Profiles are single-instance locked, so
+    two concurrent sessions using the same profile will fail the second launch;
+    callers sharing a profile must serialize.
     """
     driver = _firefox_driver(opts.headless, opts.profile)
     try:
@@ -172,6 +219,7 @@ def firefox_page_source(
     Waits (up to opts.wait) until `ready_js` is truthy rather than sleeping a
     fixed time, so it returns as soon as the page is ready.
     """
+    validate_public_url(url)
     with firefox_session(opts) as driver:
         driver.get(url)
         _await_ready(driver, ready_js, opts.wait)
@@ -227,6 +275,7 @@ def firefox_execute(
     (and runs `scroll_more_js` to click load-more controls) to load lazy content
     up to `scroll_target` items first.
     """
+    validate_public_url(url)
     with firefox_session(opts) as driver:
         driver.get(url.split("?")[0])
         if ready_js:
