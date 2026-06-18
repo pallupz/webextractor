@@ -128,12 +128,19 @@ def _firefox_driver(headless: bool = True, profile: str | None = None):
 
 @contextmanager
 def firefox_session(opts: FetchOptions):
-    """Yield a Firefox driver, quitting it on exit."""
+    """Yield a Firefox driver, always quitting it (browser + geckodriver) on exit.
+
+    quit() runs in a finally and is guarded so a failed teardown never masks the
+    original error or leaves the caller without cleanup.
+    """
     driver = _firefox_driver(opts.headless, opts.profile)
     try:
         yield driver
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
 
 
 # JS predicate for a generic page: the initial document has finished loading.
@@ -171,16 +178,62 @@ def firefox_page_source(
         return driver.page_source, "text/html"
 
 
+def _scroll_for_more(
+    driver,
+    count_js: str,
+    target: int,
+    round_timeout: float,
+    more_js: str | None = None,
+    max_rounds: int = 40,
+) -> None:
+    """Load lazy content by scrolling and (optionally) clicking load-more controls.
+
+    `count_js` returns the current item count. Each round scrolls to the bottom
+    and runs `more_js` (which clicks any "load more" buttons), then waits for the
+    count to grow. Stops when the count reaches `target`, when a round loads
+    nothing new within `round_timeout` (end of content), or after `max_rounds`.
+    """
+    from selenium.common.exceptions import TimeoutException
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    for _ in range(max_rounds):
+        count = driver.execute_script(count_js)
+        if count >= target:
+            return
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        if more_js:
+            driver.execute_script(more_js)
+        try:
+            WebDriverWait(driver, round_timeout, poll_frequency=0.25).until(
+                lambda d: d.execute_script(count_js) > count
+            )
+        except TimeoutException:
+            return  # nothing new loaded -> reached the end
+
+
 def firefox_execute(
-    url: str, opts: FetchOptions, script: str, ready_js: str | None = None
+    url: str,
+    opts: FetchOptions,
+    script: str,
+    ready_js: str | None = None,
+    scroll_count_js: str | None = None,
+    scroll_target: int = 0,
+    scroll_more_js: str | None = None,
 ):
     """Render a URL in Firefox and return the result of `script`.
 
     If `ready_js` is given, waits (up to opts.wait) until it is truthy before
-    running `script` - e.g. until the target content has rendered.
+    running `script`. If `opts.scroll` and `scroll_count_js` are set, scrolls
+    (and runs `scroll_more_js` to click load-more controls) to load lazy content
+    up to `scroll_target` items first.
     """
     with firefox_session(opts) as driver:
         driver.get(url.split("?")[0])
         if ready_js:
             _await_ready(driver, ready_js, opts.wait)
+        if opts.scroll and scroll_count_js:
+            _scroll_for_more(
+                driver, scroll_count_js, scroll_target,
+                min(opts.wait, 6), more_js=scroll_more_js,
+            )
         return driver.execute_script(script)

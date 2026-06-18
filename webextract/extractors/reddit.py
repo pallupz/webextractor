@@ -89,6 +89,15 @@ _REDDIT_READY = (
     "return cc === 0 || document.querySelector('shreddit-comment') != null;"
 )
 
+# Click inline "N more replies" expander BUTTONS so nested replies load in place.
+# Only <button>s: the equivalent <a> links navigate away to a single-thread page.
+_REDDIT_LOAD_MORE = (
+    "const re = /more (repl|comment)/i;"
+    "const btns = [...document.querySelectorAll('button')]"
+    "  .filter(b => re.test(b.textContent || ''));"
+    "btns.slice(0, 20).forEach(b => { try { b.click(); } catch (e) {} });"
+)
+
 
 @register
 class RedditExtractor(Extractor):
@@ -106,7 +115,13 @@ class RedditExtractor(Extractor):
     # -- Firefox / rendered DOM (preferred) -------------------------------- #
 
     def _extract_dom(self, url: str, opts: FetchOptions) -> dict:
-        data = firefox_execute(url, opts, _REDDIT_DOM_SCRIPT, ready_js=_REDDIT_READY)
+        data = firefox_execute(
+            url, opts, _REDDIT_DOM_SCRIPT,
+            ready_js=_REDDIT_READY,
+            scroll_count_js="return document.querySelectorAll('shreddit-comment').length;",
+            scroll_target=opts.max_items,
+            scroll_more_js=_REDDIT_LOAD_MORE,
+        )
         if not data or not data.get("title"):
             raise RuntimeError("could not find post content in rendered page")
         permalink = data.get("permalink") or ""

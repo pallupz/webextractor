@@ -17,6 +17,7 @@ python -m venv .venv
 webextract <url>                    # plain HTTP
 webextract <url> --firefox          # render via real Firefox (JS, bot blocks)
 webextract <url> --profile logged-in  # use a logged-in Firefox profile
+webextract <url> --scroll --max-items 200  # load more lazy content (e.g. comments)
 webextract <url> --json             # structured output
 webextract --list-extractors
 ```
@@ -28,11 +29,18 @@ Programmatic:
 ```python
 from webextract import extract
 data = extract("https://example.com")
-data = extract("https://www.reddit.com/r/.../", profile="logged-in")
+data = extract("https://www.reddit.com/r/.../", profile="logged-in", scroll=True, max_items=200)
 ```
 
 Options: `--firefox`, `--profile NAME`, `--no-headless`, `--max-items N`,
-`--wait SECONDS`, `--json`.
+`--scroll`, `--wait SECONDS`, `--json`.
+
+`--scroll` loads lazily-rendered content up to `--max-items` by scrolling to the
+bottom and clicking inline "N more replies" buttons. For Reddit this expands the
+comment tree; "continue this thread" links that navigate to a separate page are
+intentionally not followed, so extremely deep tails may not be fully captured.
+Every Firefox launch is torn down (browser + driver) in a `finally`, so no
+browser processes are left behind.
 
 ## MCP server
 

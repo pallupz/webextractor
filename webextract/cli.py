@@ -34,6 +34,11 @@ def main(argv: list[str] | None = None) -> int:
         help="cap for list-like content such as comments (default 50)",
     )
     ap.add_argument(
+        "--scroll", action="store_true",
+        help="scroll to load more lazy-loaded content (e.g. Reddit comments), "
+        "up to --max-items",
+    )
+    ap.add_argument(
         "--wait", type=float, default=15.0,
         help="max seconds to wait for JS content to render in Firefox (default 15)",
     )
@@ -57,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         profile=args.profile,
         wait=args.wait,
         max_items=args.max_items,
+        scroll=args.scroll,
     )
 
     extractor = get_extractor(args.url)

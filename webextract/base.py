@@ -18,6 +18,7 @@ class FetchOptions:
     profile: str | None = None     # Firefox profile name/path (implies firefox)
     wait: float = 15.0             # max seconds to wait for JS content to render
     max_items: int = 50            # cap for list-like content (e.g. comments)
+    scroll: bool = False           # scroll to load lazy content, up to max_items
 
     @property
     def use_browser(self) -> bool:
