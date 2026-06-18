@@ -36,19 +36,19 @@ Options: `--firefox`, `--profile NAME`, `--no-headless`, `--max-items N`,
 
 ## Architecture
 
-- `base.py` - `Extractor` base class, `FetchOptions`, and the registry.
-- `fetch.py` - HTTP and Firefox/Selenium backends, profile resolution.
-- `markdown.py` - shared HTML/DOM to markdown helpers.
-- `cli.py` / `__main__.py` - command line entry point.
-- `extractors/` - one module per site; `generic.py` is the always-matches
-  fallback. Each is registered with `@register`.
+- `webextract/base.py` - `Extractor` base class, `FetchOptions`, and the registry.
+- `webextract/fetch.py` - HTTP and Firefox/Selenium backends, profile resolution.
+- `webextract/markdown.py` - shared HTML/DOM to markdown helpers.
+- `webextract/cli.py` / `__main__.py` - command line entry point.
+- `webextract/extractors/` - one module per site; `generic.py` is the
+  always-matches fallback. Each is registered with `@register`.
 
 Dispatch: `get_extractor(url)` returns the highest-`priority` extractor whose
 `matches(url)` is true; `generic` (priority -100) catches everything else.
 
 ## Adding a new site
 
-1. Create `extractors/<site>.py`:
+1. Create `webextract/extractors/<site>.py`:
 
    ```python
    from ..base import Extractor, FetchOptions, register
@@ -66,7 +66,7 @@ Dispatch: `get_extractor(url)` returns the highest-`priority` extractor whose
            # optionally override render(self, data) for custom output
    ```
 
-2. Import it in `extractors/__init__.py` so it registers.
+2. Import it in `webextract/extractors/__init__.py` so it registers.
 
 That's it - `main` never changes.
 
