@@ -150,12 +150,11 @@ class RedditExtractor(Extractor):
         try:
             raw, _ = http_get(json_url, accept="application/json")
             payload = json.loads(raw)
+            post = payload[0]["data"]["children"][0]["data"]
         except Exception as e:
             raise RuntimeError(
                 f"Reddit .json fetch failed ({e}); retry with --firefox/--profile"
             ) from e
-
-        post = payload[0]["data"]["children"][0]["data"]
 
         def walk(children, depth=0):
             out = []
