@@ -74,6 +74,11 @@ def _lookup_profile_db(name: str) -> str | None:
 class FirefoxBrowser(Browser):
     name = "firefox"
 
+    def is_available(self) -> bool:
+        import shutil
+
+        return bool(shutil.which("firefox")) or os.path.exists("/Applications/Firefox.app")
+
     def build_driver(self, headless: bool = True, profile: str | None = None):
         """Create a Selenium Firefox driver.
 

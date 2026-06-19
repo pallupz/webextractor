@@ -7,7 +7,7 @@ import json
 import pytest
 
 from webextract import browsers
-from webextract.browsers import chrome, firefox
+from webextract.browsers import base, chrome, firefox
 
 
 def test_registry_has_both_and_rejects_unknown():
@@ -16,6 +16,74 @@ def test_registry_has_both_and_rejects_unknown():
     assert browsers.get_browser("firefox").name == "firefox"
     with pytest.raises(ValueError, match="unknown browser"):
         browsers.get_browser("safari")
+
+
+# -- engine resolution (install check + extractor fallback) ---------------- #
+
+def _fake_available(monkeypatch, installed):
+    monkeypatch.setattr(base, "available", lambda: list(installed))
+
+
+def test_resolve_explicit_choice_when_installed(monkeypatch):
+    _fake_available(monkeypatch, ["chrome", "firefox"])
+    assert base.resolve_engine("chrome") == "chrome"
+
+
+def test_resolve_explicit_choice_not_installed_errors(monkeypatch):
+    _fake_available(monkeypatch, ["firefox"])
+    with pytest.raises(RuntimeError, match="chrome.*not installed"):
+        base.resolve_engine("chrome")
+
+
+def test_resolve_auto_prefers_extractor_choice(monkeypatch):
+    _fake_available(monkeypatch, ["chrome", "firefox"])
+    # no explicit request: an extractor that prefers firefox gets firefox even
+    # though chrome is also installed
+    assert base.resolve_engine(None, preferred=("firefox",)) == "firefox"
+
+
+def test_resolve_auto_falls_back_to_any_installed(monkeypatch):
+    _fake_available(monkeypatch, ["chrome"])
+    # prefers firefox but only chrome is installed -> chrome
+    assert base.resolve_engine(None, preferred=("firefox",)) == "chrome"
+
+
+def test_resolve_auto_defaults_to_firefox(monkeypatch):
+    _fake_available(monkeypatch, ["chrome", "firefox"])
+    assert base.resolve_engine(None) == "firefox"
+
+
+def test_resolve_no_browser_installed_errors(monkeypatch):
+    _fake_available(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="no supported browser"):
+        base.resolve_engine(None)
+
+
+def test_is_available_returns_bool():
+    assert isinstance(firefox.FirefoxBrowser().is_available(), bool)
+    assert isinstance(chrome.ChromeBrowser().is_available(), bool)
+
+
+# -- extractor-level resolution (Extractor.resolve_browser) ---------------- #
+
+def test_reddit_auto_picks_firefox(monkeypatch):
+    from webextract.base import FetchOptions
+    from webextract.extractors.reddit import RedditExtractor
+
+    _fake_available(monkeypatch, ["chrome", "firefox"])
+    out = RedditExtractor().resolve_browser(FetchOptions(scroll=True))
+    assert out.engine == "firefox"  # preferred, even with chrome installed
+
+
+def test_browser_and_profile_preserved_together(monkeypatch):
+    from webextract.base import FetchOptions
+    from webextract.extractors.generic import GenericExtractor
+
+    _fake_available(monkeypatch, ["chrome", "firefox"])
+    out = GenericExtractor().resolve_browser(
+        FetchOptions(browser="chrome", profile="Work")
+    )
+    assert out.engine == "chrome" and out.profile == "Work"
 
 
 # -- Chrome profile resolution --------------------------------------------- #

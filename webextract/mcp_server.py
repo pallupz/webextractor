@@ -42,7 +42,7 @@ mcp = FastMCP(
 def fetch_page(
     url: str,
     use_browser: bool = False,
-    browser: str = "firefox",
+    browser: str = "",
     profile: str = "",
     max_items: int = 50,
     scroll: bool = False,
@@ -56,8 +56,9 @@ def fetch_page(
         url: The page URL to fetch.
         use_browser: Render in a real browser (runs JavaScript, bypasses many
             bot blocks). Needed for JS-heavy or blocked sites such as Reddit.
-        browser: Which browser to render in, "firefox" (default) or "chrome".
-            Only applies when use_browser/scroll/profile request a browser.
+        browser: Which browser to render in, "firefox" or "chrome". Leave empty
+            to auto-pick an installed browser (the extractor's preferred one, or
+            Firefox). Only applies when use_browser/scroll/profile request one.
         profile: Name of a logged-in browser profile to reuse (local servers
             only; ignored when the server runs over HTTP). Defaults to the
             WEBEXTRACT_PROFILE env var if set.
@@ -73,10 +74,10 @@ def fetch_page(
     """
     # Never honor a caller-supplied (or env) profile when reachable remotely.
     effective_profile = None if _REMOTE else (profile or DEFAULT_PROFILE)
-    want_browser = use_browser or scroll or bool(effective_profile)
     data = extract(
         url,
-        browser=(browser if want_browser else None),
+        render=use_browser,        # force a browser; engine auto unless named
+        browser=(browser or None),
         profile=effective_profile,
         max_items=max_items,
         scroll=scroll,

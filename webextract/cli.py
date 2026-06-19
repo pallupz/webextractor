@@ -59,8 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("the following argument is required: url")
 
     opts = FetchOptions(
-        # scrolling needs a real browser; default to firefox when none named
-        browser=args.browser or ("firefox" if args.scroll else None),
+        browser=args.browser,  # None = auto; --scroll/--profile still imply a browser
         headless=args.headless,
         profile=args.profile,
         wait=args.wait,

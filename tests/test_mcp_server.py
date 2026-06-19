@@ -50,14 +50,23 @@ def test_scroll_implies_browser(monkeypatch, capture_extract):
     monkeypatch.setattr(mcp_server, "_REMOTE", False)
     monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)
     mcp_server.fetch_page("https://x.com", scroll=True)
-    assert capture_extract["browser"] == "firefox"
     assert capture_extract["scroll"] is True
+    assert capture_extract["browser"] is None  # auto-pick
+
+
+def test_use_browser_sets_render_with_auto_engine(monkeypatch, capture_extract):
+    monkeypatch.setattr(mcp_server, "_REMOTE", False)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)
+    mcp_server.fetch_page("https://x.com", use_browser=True)
+    assert capture_extract["render"] is True
+    assert capture_extract["browser"] is None
 
 
 def test_plain_fetch_passes_no_browser(monkeypatch, capture_extract):
     monkeypatch.setattr(mcp_server, "_REMOTE", False)
     monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)
     mcp_server.fetch_page("https://x.com")
+    assert capture_extract["render"] is False
     assert capture_extract["browser"] is None
 
 

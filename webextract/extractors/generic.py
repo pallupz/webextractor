@@ -23,7 +23,7 @@ class GenericExtractor(Extractor):
 
     def extract(self, url: str, opts: FetchOptions) -> dict:
         if opts.use_browser:
-            html, content_type = render_page_source(url, opts)
+            html, content_type = render_page_source(url, self.resolve_browser(opts))
         else:
             try:
                 html, content_type = http_get(url)

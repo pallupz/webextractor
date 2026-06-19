@@ -103,6 +103,9 @@ _REDDIT_LOAD_MORE = (
 class RedditExtractor(Extractor):
     name = "reddit"
     priority = 100
+    # Reddit's bot detection blocks headless Chrome far more than Firefox, so
+    # prefer Firefox when the caller did not explicitly pick a browser.
+    preferred_browsers = ("firefox",)
 
     def matches(self, url: str) -> bool:
         return re.search(r"https?://(\w+\.)?reddit\.com(/|$)", url) is not None
@@ -118,7 +121,7 @@ class RedditExtractor(Extractor):
         # Drop the query string: Reddit's sort/context params don't change the
         # shreddit DOM we read, and a bare permalink renders most reliably.
         data = render_execute(
-            url.split("?")[0], opts, _REDDIT_DOM_SCRIPT,
+            url.split("?")[0], self.resolve_browser(opts), _REDDIT_DOM_SCRIPT,
             ready_js=_REDDIT_READY,
             scroll_count_js="return document.querySelectorAll('shreddit-comment').length;",
             scroll_target=opts.max_items,

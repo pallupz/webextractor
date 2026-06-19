@@ -38,10 +38,16 @@ Options: `--browser {firefox,chrome}`, `--profile NAME`, `--no-headless`,
 `--max-items N`, `--scroll`, `--wait SECONDS`, `--json`.
 
 `--browser` renders the page in a real browser (Firefox or Chrome) to run
-JavaScript and get past bot blocks. `--profile` and `--scroll` imply a browser
-(defaulting to Firefox). Note: for Reddit, prefer Firefox; Reddit's bot
-detection blocks headless Chrome more aggressively, so the rendered DOM often
-comes back empty there.
+JavaScript and get past bot blocks, and combines with `--profile`
+(e.g. `--browser chrome --profile Work`). `--profile` and `--scroll` also imply
+a browser on their own. When no browser is named, an installed one is auto-
+picked: the extractor's preferred browser if set (Reddit prefers Firefox),
+otherwise Firefox. Naming a browser that is not installed is a clear error, and
+if none of the supported browsers are installed you get told to install one.
+
+Note: for Reddit, prefer Firefox; Reddit's bot detection blocks headless Chrome
+more aggressively, so the rendered DOM often comes back empty there. The Reddit
+extractor auto-selects Firefox for this reason.
 
 `--scroll` loads lazily-rendered content up to `--max-items` by scrolling to the
 bottom and clicking inline "N more replies" buttons. For Reddit this expands the

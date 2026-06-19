@@ -49,6 +49,15 @@ def resolve_profile(profile: str | None) -> tuple[str, str] | None:
 class ChromeBrowser(Browser):
     name = "chrome"
 
+    def is_available(self) -> bool:
+        import shutil
+
+        return bool(
+            shutil.which("google-chrome") or shutil.which("google-chrome-stable")
+            or shutil.which("chromium") or shutil.which("chromium-browser")
+            or shutil.which("chrome")
+        ) or os.path.exists("/Applications/Google Chrome.app")
+
     def build_driver(self, headless: bool = True, profile: str | None = None):
         """Create a Selenium Chrome driver.
 

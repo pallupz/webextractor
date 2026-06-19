@@ -20,6 +20,10 @@ class Browser:
     def build_driver(self, headless: bool, profile: str | None):
         raise NotImplementedError
 
+    def is_available(self) -> bool:
+        """True if this browser appears installed on the system."""
+        return False
+
 
 _BROWSERS: dict[str, Browser] = {}
 
@@ -42,3 +46,29 @@ def get_browser(name: str) -> Browser:
 
 def names() -> list[str]:
     return sorted(_BROWSERS)
+
+
+def available() -> list[str]:
+    """Names of registered browsers that appear installed."""
+    return [n for n in names() if _BROWSERS[n].is_available()]
+
+
+def resolve_engine(requested: str | None, preferred: tuple[str, ...] = ()) -> str:
+    """Pick a concrete, installed browser engine.
+
+    An explicit `requested` engine must be installed (a clear error otherwise).
+    With no explicit request, fall back to the first installed browser among
+    `preferred` (an extractor's choice), then Firefox, then any other.
+    """
+    avail = available()
+    if requested:
+        if requested in avail:
+            return requested
+        raise RuntimeError(
+            f"browser {requested!r} is not installed "
+            f"(installed: {', '.join(avail) or 'none'})"
+        )
+    for name in (*preferred, "firefox", *names()):
+        if name in avail:
+            return name
+    raise RuntimeError("no supported browser installed (install Firefox or Chrome)")
