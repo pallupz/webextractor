@@ -1,6 +1,6 @@
 """Reddit extractor.
 
-Prefers a real Firefox (the .json endpoint is often blocked by Reddit's
+Prefers a real browser (the .json endpoint is often blocked by Reddit's
 network security, while the JS-challenged HTML page loads fine). Reads the
 shreddit DOM into a structured post + threaded comments, keeping inline links
 and images and the post's primary media (image / gallery / video / link) as
@@ -13,7 +13,7 @@ import json
 import re
 
 from ..base import Extractor, FetchOptions, register
-from ..fetch import firefox_execute, http_get
+from ..fetch import http_get, render_execute
 from ..markdown import JS_MARKDOWN_FN
 
 # Built in the browser: md() (from JS_MARKDOWN_FN) + the post's primary media.
@@ -117,7 +117,7 @@ class RedditExtractor(Extractor):
     def _extract_dom(self, url: str, opts: FetchOptions) -> dict:
         # Drop the query string: Reddit's sort/context params don't change the
         # shreddit DOM we read, and a bare permalink renders most reliably.
-        data = firefox_execute(
+        data = render_execute(
             url.split("?")[0], opts, _REDDIT_DOM_SCRIPT,
             ready_js=_REDDIT_READY,
             scroll_count_js="return document.querySelectorAll('shreddit-comment').length;",

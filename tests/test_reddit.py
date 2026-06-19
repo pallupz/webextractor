@@ -86,20 +86,20 @@ def test_dom_extract_strips_query_string(monkeypatch):
         captured["url"] = url
         return {"title": "T", "permalink": "/r/x/comments/1/t/", "comments": []}
 
-    monkeypatch.setattr(reddit_mod, "firefox_execute", fake_exec)
+    monkeypatch.setattr(reddit_mod, "render_execute", fake_exec)
     RedditExtractor().extract(
         "https://www.reddit.com/r/x/comments/1/t/?sort=top&context=3",
-        FetchOptions(firefox=True),
+        FetchOptions(browser="firefox"),
     )
     assert captured["url"] == "https://www.reddit.com/r/x/comments/1/t/"
 
 
 def test_dom_extract_raises_when_no_post(monkeypatch):
     monkeypatch.setattr(
-        reddit_mod, "firefox_execute",
+        reddit_mod, "render_execute",
         lambda *a, **k: {"comments": []},  # no title
     )
     with pytest.raises(RuntimeError, match="post content"):
         RedditExtractor().extract(
-            "https://www.reddit.com/r/x/", FetchOptions(firefox=True)
+            "https://www.reddit.com/r/x/", FetchOptions(browser="firefox")
         )

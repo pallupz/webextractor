@@ -13,16 +13,22 @@ from dataclasses import dataclass
 class FetchOptions:
     """How to fetch a page, shared by every extractor."""
 
-    firefox: bool = False          # render via a real Firefox (Selenium)
-    headless: bool = True          # run that Firefox headless
-    profile: str | None = None     # Firefox profile name/path (implies firefox)
+    browser: str | None = None     # "firefox" | "chrome"; None = plain HTTP
+    headless: bool = True          # run the browser headless
+    profile: str | None = None     # browser profile name/path (implies a browser)
     wait: float = 15.0             # max seconds to wait for JS content to render
     max_items: int = 50            # cap for list-like content (e.g. comments)
     scroll: bool = False           # scroll to load lazy content, up to max_items
 
     @property
     def use_browser(self) -> bool:
-        return self.firefox or bool(self.profile)
+        return self.browser is not None or self.profile is not None
+
+    @property
+    def engine(self) -> str:
+        """The browser backend to drive (defaults to firefox when only a
+        profile is given)."""
+        return self.browser or "firefox"
 
 
 class Extractor:
