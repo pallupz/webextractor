@@ -10,8 +10,15 @@ from webextract.base import FetchOptions
 
 def test_use_browser_property():
     assert FetchOptions().use_browser is False
-    assert FetchOptions(firefox=True).use_browser is True
+    assert FetchOptions(browser="firefox").use_browser is True
     assert FetchOptions(profile="logged-in").use_browser is True
+
+
+def test_engine_property():
+    assert FetchOptions(browser="chrome").engine == "chrome"
+    assert FetchOptions(browser="firefox").engine == "firefox"
+    # a profile alone implies a browser; engine defaults to firefox
+    assert FetchOptions(profile="logged-in").engine == "firefox"
 
 
 def test_get_extractor_routes_reddit_vs_generic():
@@ -27,11 +34,11 @@ def test_extract_passes_kwargs_to_options(monkeypatch):
         captured["opts"] = opts
         return ("<title>t</title>body", "text/html")
 
-    monkeypatch.setattr(generic_mod, "firefox_page_source", fake_source)
-    extract("https://example.com", firefox=True, max_items=7, scroll=True)
+    monkeypatch.setattr(generic_mod, "render_page_source", fake_source)
+    extract("https://example.com", browser="firefox", max_items=7, scroll=True)
     assert captured["opts"].max_items == 7
     assert captured["opts"].scroll is True
-    assert captured["opts"].firefox is True
+    assert captured["opts"].browser == "firefox"
 
 
 def test_extract_rejects_unknown_kwarg():

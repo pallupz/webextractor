@@ -45,12 +45,12 @@ def test_plain_fetch_returns_markdown(monkeypatch):
     assert data["extractor"] == "generic"
 
 
-def test_browser_path_uses_firefox(monkeypatch):
+def test_browser_path_renders(monkeypatch):
     monkeypatch.setattr(
-        generic_mod, "firefox_page_source",
+        generic_mod, "render_page_source",
         lambda url, opts: ("<title>B</title><body>browser</body>", "text/html"),
     )
-    data = GenericExtractor().extract("http://x.com", FetchOptions(firefox=True))
+    data = GenericExtractor().extract("http://x.com", FetchOptions(browser="firefox"))
     assert data["title"] == "B" and "browser" in data["text"]
 
 
@@ -61,9 +61,9 @@ def test_scroll_drives_generic_browser_path(monkeypatch):
         seen["scroll"] = opts.scroll
         return ("<title>S</title><body>more</body>", "text/html")
 
-    monkeypatch.setattr(generic_mod, "firefox_page_source", fake_source)
-    # scroll implies browser, so the generic extractor takes the firefox path.
+    monkeypatch.setattr(generic_mod, "render_page_source", fake_source)
+    # scroll implies browser, so the generic extractor takes the browser path.
     data = GenericExtractor().extract(
-        "http://x.com", FetchOptions(firefox=True, scroll=True)
+        "http://x.com", FetchOptions(browser="firefox", scroll=True)
     )
     assert seen["scroll"] is True and data["title"] == "S"

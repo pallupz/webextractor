@@ -15,8 +15,9 @@ python -m venv .venv
 
 ```bash
 webextract <url>                    # plain HTTP
-webextract <url> --firefox          # render via real Firefox (JS, bot blocks)
-webextract <url> --profile logged-in  # use a logged-in Firefox profile
+webextract <url> --browser firefox  # render via real browser (JS, bot blocks)
+webextract <url> --browser chrome   # ... or Chrome
+webextract <url> --profile logged-in  # use a logged-in browser profile
 webextract <url> --scroll --max-items 200  # load more lazy content (e.g. comments)
 webextract <url> --json             # structured output
 webextract --list-extractors
@@ -30,16 +31,29 @@ Programmatic:
 from webextract import extract
 data = extract("https://example.com")
 data = extract("https://www.reddit.com/r/.../", profile="logged-in", scroll=True, max_items=200)
+data = extract("https://example.com", browser="chrome")
 ```
 
-Options: `--firefox`, `--profile NAME`, `--no-headless`, `--max-items N`,
-`--scroll`, `--wait SECONDS`, `--json`.
+Options: `--browser {firefox,chrome}`, `--profile NAME`, `--no-headless`,
+`--max-items N`, `--scroll`, `--wait SECONDS`, `--json`.
+
+`--browser` renders the page in a real browser (Firefox or Chrome) to run
+JavaScript and get past bot blocks, and combines with `--profile`
+(e.g. `--browser chrome --profile Work`). `--profile` and `--scroll` also imply
+a browser on their own. When no browser is named, an installed one is auto-
+picked: the extractor's preferred browser if set (Reddit prefers Firefox),
+otherwise Firefox. Naming a browser that is not installed is a clear error, and
+if none of the supported browsers are installed you get told to install one.
+
+Note: for Reddit, prefer Firefox; Reddit's bot detection blocks headless Chrome
+more aggressively, so the rendered DOM often comes back empty there. The Reddit
+extractor auto-selects Firefox for this reason.
 
 `--scroll` loads lazily-rendered content up to `--max-items` by scrolling to the
 bottom and clicking inline "N more replies" buttons. For Reddit this expands the
 comment tree; "continue this thread" links that navigate to a separate page are
 intentionally not followed, so extremely deep tails may not be fully captured.
-Every Firefox launch is torn down (browser + driver) in a `finally`, so no
+Every browser launch is torn down (browser + driver) in a `finally`, so no
 browser processes are left behind.
 
 ## MCP server
@@ -127,7 +141,11 @@ whole `mcpServers` block if it is the only server), then reopen Claude Desktop.
 ## Architecture
 
 - `webextract/base.py` - `Extractor` base class, `FetchOptions`, and the registry.
-- `webextract/fetch.py` - HTTP and Firefox/Selenium backends, profile resolution.
+- `webextract/fetch.py` - plain-HTTP fetch, SSRF guard, and the generic
+  (browser-agnostic) Selenium driving: readiness waits, scrolling, `execute`.
+- `webextract/browsers/` - one module per browser backend (`firefox.py`,
+  `chrome.py`); each builds a Selenium driver and resolves profiles. Registered
+  with `@register`, selected by name via `FetchOptions.engine`.
 - `webextract/markdown.py` - shared HTML/DOM to markdown helpers.
 - `webextract/cli.py` / `__main__.py` - command line entry point.
 - `webextract/extractors/` - one module per site; `generic.py` is the
@@ -135,6 +153,7 @@ whole `mcpServers` block if it is the only server), then reopen Claude Desktop.
 
 Dispatch: `get_extractor(url)` returns the highest-`priority` extractor whose
 `matches(url)` is true; `generic` (priority -100) catches everything else.
+A browser, when needed, is picked by name with `get_browser(opts.engine)`.
 
 ## Adding a new site
 
@@ -160,7 +179,16 @@ Dispatch: `get_extractor(url)` returns the highest-`priority` extractor whose
 
 That's it - `main` never changes.
 
+## Adding a browser
+
+Drop a module in `webextract/browsers/` with a `@register`-decorated `Browser`
+whose `build_driver(headless, profile)` returns a ready Selenium driver, then
+import it in `webextract/browsers/__init__.py`. It becomes selectable as
+`--browser <name>`. The generic rendering/scrolling code in `fetch.py` is
+browser-agnostic and needs no changes.
+
 ## Requirements
 
-`selenium` (for `--firefox`/`--profile`) and a local Firefox install;
-geckodriver is fetched automatically by Selenium Manager.
+`selenium` (for `--browser`/`--profile`/`--scroll`) and a local install of the
+chosen browser (Firefox and/or Chrome). The matching driver (geckodriver or
+chromedriver) is fetched automatically by Selenium Manager.

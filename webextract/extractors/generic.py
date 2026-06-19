@@ -1,7 +1,7 @@
 """Fallback extractor: works for most websites.
 
 Pulls the page's title and readable text, keeping links and images as
-markdown references. Use opts.firefox for JS-heavy or bot-blocked pages.
+markdown references. Use opts.browser for JS-heavy or bot-blocked pages.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from urllib.error import HTTPError
 
 from ..base import Extractor, FetchOptions, register
-from ..fetch import firefox_page_source, http_get
+from ..fetch import http_get, render_page_source
 from ..markdown import html_to_markdown
 
 
@@ -23,7 +23,7 @@ class GenericExtractor(Extractor):
 
     def extract(self, url: str, opts: FetchOptions) -> dict:
         if opts.use_browser:
-            html, content_type = firefox_page_source(url, opts)
+            html, content_type = render_page_source(url, self.resolve_browser(opts))
         else:
             try:
                 html, content_type = http_get(url)
@@ -31,8 +31,8 @@ class GenericExtractor(Extractor):
                 if e.code in (401, 403, 405, 406, 429) or e.code >= 500:
                     raise RuntimeError(
                         f"plain HTTP fetch was blocked (HTTP {e.code}); "
-                        "retry with use_browser=true (--firefox) to render in a "
-                        "real browser"
+                        "retry with use_browser=true (--browser firefox) to "
+                        "render in a real browser"
                     ) from e
                 raise
         title, text = html_to_markdown(html)
