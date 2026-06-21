@@ -35,7 +35,18 @@ data = extract("https://example.com", browser="chrome")
 ```
 
 Options: `--browser {firefox,chrome}`, `--profile NAME`, `--no-headless`,
-`--max-items N`, `--scroll`, `--wait SECONDS`, `--json`.
+`--ephemeral`, `--max-items N`, `--scroll`, `--wait SECONDS`, `--json`.
+
+### Persistent browser profile
+
+Every browser render reuses the tool's own profile (under `~/.webextract/
+profiles/<engine>`) unless you name one with `--profile`. Reusing one profile
+across runs lets cookies and a non-fresh fingerprint accumulate, which is what
+keeps bot-protected sites (Amazon, Reddit) from challenging you. It is created
+on first use and shared by every site, so it is single-instance locked: render
+one page at a time (fine for a personal/agentic tool, not for parallel runs).
+Turn it off per run with `--ephemeral`, globally with `WEBEXTRACT_NO_PERSIST=1`,
+or override it by pointing `--profile` at a real logged-in profile.
 
 `--browser` renders the page in a real browser (Firefox or Chrome) to run
 JavaScript and get past bot blocks, and combines with `--profile`
@@ -48,6 +59,38 @@ if none of the supported browsers are installed you get told to install one.
 Note: for Reddit, prefer Firefox; Reddit's bot detection blocks headless Chrome
 more aggressively, so the rendered DOM often comes back empty there. The Reddit
 extractor auto-selects Firefox for this reason.
+
+### Amazon
+
+Amazon product, listing and search pages get a dedicated structured extractor.
+It returns clean fields where the generic fallback would bury the content under
+the megamenu and ad carousels and mangle Amazon's split-span prices into
+garbled duplicates.
+
+To avoid Amazon's bot blocks (a 503/captcha or an empty page, common when
+looping or hitting a store from a foreign IP), the extractor **leads with a real
+browser** whenever one is installed - it favours reliability over speed - and
+only falls back to plain HTTP when no browser is present. If even the browser
+comes back blocked, pass `--profile <a logged-in Amazon browser profile>` to
+reuse your session, which all but eliminates blocks.
+
+```bash
+webextract "https://www.amazon.in/dp/B08T1TVFNX"            # product detail
+webextract "https://www.amazon.in/s?k=table+top+dishwasher" # search results
+webextract --json "https://www.amazon.in/dp/B08T1TVFNX"     # structured fields
+```
+
+A product extract (`type: "amazon_product"`) carries `asin`, a clean `price`,
+`rating`/`rating_count`, `feature_bullets`, a `specs` map, the `rating_histogram`,
+the AI `review_summary` (blurb + aspect chips), and a `reviews` list (each with
+`author`, `rating`, `title`, `date`, `variant`, `verified_purchase`, `body`).
+Only the page's top reviews (~8) are returned, not the full corpus. A search
+extract (`type: "amazon_search"`) returns deduped `results` with `asin`, `title`,
+`price`, `rating`, `rating_count`, and a canonical `url`.
+
+Some listings (variation/"twister" products) defer the buybox price to
+client-side JS that only the search/options view shows; there `price` can come
+back null even via the browser.
 
 `--scroll` loads lazily-rendered content up to `--max-items` by scrolling to the
 bottom and clicking inline "N more replies" buttons. For Reddit this expands the
@@ -147,6 +190,8 @@ whole `mcpServers` block if it is the only server), then reopen Claude Desktop.
   `chrome.py`); each builds a Selenium driver and resolves profiles. Registered
   with `@register`, selected by name via `FetchOptions.engine`.
 - `webextract/markdown.py` - shared HTML/DOM to markdown helpers.
+- `webextract/dom.py` - lenient stdlib HTML element tree (find by id/class/
+  data-hook) for extractors that need specific elements, not flattened text.
 - `webextract/cli.py` / `__main__.py` - command line entry point.
 - `webextract/extractors/` - one module per site; `generic.py` is the
   always-matches fallback. Each is registered with `@register`.
