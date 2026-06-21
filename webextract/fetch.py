@@ -10,6 +10,7 @@ browser-specific bits live in webextract.browsers.
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 import urllib.request
 from contextlib import contextmanager
@@ -22,6 +23,32 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 )
+
+# The tool's own browser profiles live here (one dir per engine). Reusing a
+# profile across runs lets cookies and a non-fresh fingerprint accumulate,
+# which is what actually keeps bot-protected sites (Amazon, Reddit) from
+# challenging us. Applied to every browser render unless the caller names a
+# profile, sets persist_profile=False, or exports WEBEXTRACT_NO_PERSIST.
+SESSION_PROFILE_BASE = os.path.expanduser("~/.webextract/profiles")
+
+
+def _effective_profile(opts: FetchOptions) -> str | None:
+    """Resolve which browser profile to render with.
+
+    An explicit `opts.profile` always wins. Otherwise, when persistence is on,
+    fall back to the tool's own per-engine profile (created on demand) so it is
+    reused across runs; on opt-out, return None for a throwaway profile.
+    """
+    if opts.profile:
+        return opts.profile
+    if not opts.persist_profile or os.environ.get("WEBEXTRACT_NO_PERSIST"):
+        return None
+    path = os.path.join(SESSION_PROFILE_BASE, opts.engine)
+    try:
+        os.makedirs(path, exist_ok=True)
+        return path
+    except OSError:
+        return None  # can't create it; fall back to a throwaway profile
 
 
 # --------------------------------------------------------------------------- #
@@ -94,7 +121,8 @@ def browser_session(opts: FetchOptions):
     two concurrent sessions using the same profile will fail the second launch;
     callers sharing a profile must serialize.
     """
-    driver = get_browser(opts.engine).build_driver(opts.headless, opts.profile)
+    driver = get_browser(opts.engine).build_driver(
+        opts.headless, _effective_profile(opts))
     try:
         yield driver
     finally:

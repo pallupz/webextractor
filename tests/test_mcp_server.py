@@ -46,6 +46,19 @@ def test_remote_server_ignores_supplied_profile(monkeypatch, capture_extract):
     assert capture_extract["profile"] is None
 
 
+def test_remote_server_disables_persistent_profile(monkeypatch, capture_extract):
+    monkeypatch.setattr(mcp_server, "_REMOTE", True)
+    mcp_server.fetch_page("https://x.com")
+    assert capture_extract["persist_profile"] is False  # no shared cookie jar
+
+
+def test_local_server_keeps_persistent_profile(monkeypatch, capture_extract):
+    monkeypatch.setattr(mcp_server, "_REMOTE", False)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)
+    mcp_server.fetch_page("https://x.com")
+    assert capture_extract["persist_profile"] is True
+
+
 def test_scroll_implies_browser(monkeypatch, capture_extract):
     monkeypatch.setattr(mcp_server, "_REMOTE", False)
     monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)

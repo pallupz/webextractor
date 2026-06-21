@@ -24,7 +24,9 @@ DEFAULT_PROFILE = os.environ.get("WEBEXTRACT_PROFILE") or None
 
 # Set true when serving over HTTP. A remote caller must not be able to drive the
 # server's logged-in Firefox profiles (cookie/session exfiltration), so the
-# profile argument and WEBEXTRACT_PROFILE are ignored in that mode.
+# profile argument and WEBEXTRACT_PROFILE are ignored in that mode - and the
+# tool's persistent profile is disabled too, so remote renders never share an
+# accumulating cookie jar.
 _REMOTE = False
 
 mcp = FastMCP(
@@ -72,13 +74,15 @@ def fetch_page(
     Returns:
         Readable page content as markdown (text, with links/images as references).
     """
-    # Never honor a caller-supplied (or env) profile when reachable remotely.
+    # Never honor a caller-supplied (or env) profile when reachable remotely,
+    # and keep remote renders stateless (no shared persistent cookie jar).
     effective_profile = None if _REMOTE else (profile or DEFAULT_PROFILE)
     data = extract(
         url,
         render=use_browser,        # force a browser; engine auto unless named
         browser=(browser or None),
         profile=effective_profile,
+        persist_profile=not _REMOTE,
         max_items=max_items,
         scroll=scroll,
     )
