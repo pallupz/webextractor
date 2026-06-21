@@ -20,6 +20,9 @@ class FetchOptions:
     wait: float = 15.0             # max seconds to wait for JS content to render
     max_items: int = 50            # cap for list-like content (e.g. comments)
     scroll: bool = False           # scroll to load lazy content, up to max_items
+    persist_profile: bool = True   # reuse the tool's own browser profile when
+    #                                no profile is named, so cookies/trust build
+    #                                up across runs (set False for a throwaway)
 
     @property
     def use_browser(self) -> bool:

@@ -32,6 +32,11 @@ def main(argv: list[str] | None = None) -> int:
         help="show the browser window instead of running headless",
     )
     ap.add_argument(
+        "--ephemeral", action="store_true",
+        help="don't reuse the tool's persistent browser profile (a fresh "
+        "throwaway profile each run; also via WEBEXTRACT_NO_PERSIST=1)",
+    )
+    ap.add_argument(
         "--max-items", type=int, default=50,
         help="cap for list-like content such as comments (default 50)",
     )
@@ -65,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         wait=args.wait,
         max_items=args.max_items,
         scroll=args.scroll,
+        persist_profile=not args.ephemeral,
     )
 
     extractor = get_extractor(args.url)
