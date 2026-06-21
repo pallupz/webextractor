@@ -4,6 +4,38 @@ Extract readable content from a webpage as markdown. Text is preserved;
 hyperlinks become `[text](href)` and images become `![alt](src)`. Media is
 referenced, never downloaded.
 
+## Purpose & scope
+
+A personal, agentic web reader: point it at a URL and get back clean markdown
+or structured data, including for pages that block a plain fetch or render their
+content with JavaScript. It is the fallback you reach for when a normal web
+fetch returns a login wall, a bot challenge, or an empty JS-only shell. Most
+sites go through a generic readability pass; a few (Reddit, Amazon) have
+dedicated extractors that return structured fields.
+
+**What it is:**
+
+- A single-user tool for interactive or agentic lookups, one page at a time.
+- Reliability-first: it leads with a real browser and reuses a persistent
+  profile so cookies and trust build up, because the priority is not getting
+  blocked rather than raw speed.
+- A clean-data layer: structured output (`--json`) for the dedicated sites, and
+  readable markdown for everything else.
+
+**What it is not:**
+
+- Not a bulk scraper or crawler. Renders are serial (the shared browser profile
+  is single-instance locked), and it does not spider links, queue jobs, or
+  manage proxies/rate limits. Use it at human/agent pace, not for mass data
+  collection.
+- Not a stable API. It parses live HTML, so fields are best-effort and can shift
+  when a site changes its markup; treat it as a reader, not a guaranteed feed.
+- Not exhaustive per page. The dedicated extractors capture what the page itself
+  serves (e.g. Amazon returns the on-page top reviews, not the full corpus).
+- Not a media downloader. Images and video stay as URL references.
+- Not a tool for defeating authentication or paywalls. Reusing *your own*
+  logged-in profile is supported; circumventing access controls is not the goal.
+
 ## Install
 
 ```bash
