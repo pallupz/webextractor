@@ -86,8 +86,11 @@ class FirefoxBrowser(Browser):
         are single-instance locked), and only its default (No Container)
         context's cookies are visible to automation.
         """
+        import shutil
+
         from selenium import webdriver
         from selenium.webdriver.firefox.options import Options
+        from selenium.webdriver.firefox.service import Service
 
         opts = Options()
         if headless:
@@ -96,6 +99,10 @@ class FirefoxBrowser(Browser):
         if profile_dir:
             opts.add_argument("-profile")
             opts.add_argument(profile_dir)
-        driver = webdriver.Firefox(options=opts)
+        # A geckodriver already on PATH beats Selenium Manager, which has no
+        # binary for linux-aarch64 and fails outright there.
+        gecko = shutil.which("geckodriver")
+        service = Service(executable_path=gecko) if gecko else None
+        driver = webdriver.Firefox(options=opts, service=service)
         driver.set_page_load_timeout(60)
         return driver
