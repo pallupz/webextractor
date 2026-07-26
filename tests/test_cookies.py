@@ -153,6 +153,55 @@ def test_http_get_sends_no_cookie_header_without_profile(tmp_path, monkeypatch):
     assert "Cookie" not in seen["headers"]
 
 
+def test_impersonate_routes_through_curl_cffi(tmp_path, monkeypatch):
+    prof = make_profile(tmp_path, [(".example.com", "/", "a", "1", FUTURE, 1)])
+    seen = {}
+
+    class FakeResp:
+        status_code = 200
+        reason = "OK"
+        headers = {"content-type": "text/html; charset=utf-8"}
+        text = "<title>ok</title>"
+
+    def fake_get(url, headers=None, impersonate=None, timeout=None):
+        seen.update(url=url, headers=headers, impersonate=impersonate)
+        return FakeResp()
+
+    monkeypatch.setattr(fetch, "_impersonated_get", fetch._impersonated_get)
+    monkeypatch.setitem(
+        __import__("sys").modules, "curl_cffi",
+        type("M", (), {"requests": type("R", (), {"get": staticmethod(fake_get)})}),
+    )
+    body, ctype = fetch.http_get(
+        "https://example.com/", cookie_profile=prof, impersonate="firefox135"
+    )
+    assert seen["impersonate"] == "firefox135"
+    assert seen["headers"]["Cookie"] == "a=1"
+    assert ctype == "text/html"
+    assert body == "<title>ok</title>"
+
+
+def test_impersonate_raises_httperror_on_block(monkeypatch):
+    """Blocks must surface as HTTPError so the extractor's hint path still runs."""
+    from urllib.error import HTTPError
+
+    class FakeResp:
+        status_code = 403
+        reason = "Forbidden"
+        headers = {"content-type": "text/html"}
+        text = "denied"
+
+    def fake_get(url, headers=None, impersonate=None, timeout=None):
+        return FakeResp()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "curl_cffi",
+        type("M", (), {"requests": type("R", (), {"get": staticmethod(fake_get)})}),
+    )
+    with pytest.raises(HTTPError):
+        fetch.http_get("https://example.com/", impersonate="firefox135")
+
+
 def test_cookie_profile_does_not_imply_a_browser():
     """The whole point is a plain fetch; unlike `profile` it must not render."""
     assert FetchOptions(cookie_profile="logged-in").use_browser is False

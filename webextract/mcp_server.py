@@ -47,6 +47,7 @@ def fetch_page(
     browser: str = "",
     profile: str = "",
     cookies_from_profile: str = "",
+    impersonate: str = "",
     max_items: int = 50,
     scroll: bool = False,
 ) -> str:
@@ -71,6 +72,10 @@ def fetch_page(
             with a valid session: browse the site in that profile first, then
             fetch with this. Does not start a browser, so it is also much
             lighter on the site than use_browser.
+        impersonate: Browser target ("firefox135", "chrome131", ...) whose TLS
+            and HTTP/2 handshake the plain HTTP fetch should reproduce. Pair
+            with cookies_from_profile when a site checks that the connection
+            matches the browser the session was established in.
         max_items: Cap on list-like content such as comments.
         scroll: Load more lazily-rendered content by scrolling to the bottom
             until the page stops growing. On sites with a dedicated extractor
@@ -92,6 +97,7 @@ def fetch_page(
         # Same reasoning as `profile`: a remote caller must never be able to
         # read this machine's cookie jars.
         cookie_profile=(None if _REMOTE else (cookies_from_profile or None)),
+        impersonate=(impersonate or None),
         persist_profile=not _REMOTE,
         max_items=max_items,
         scroll=scroll,

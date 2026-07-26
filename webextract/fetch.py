@@ -12,6 +12,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import urllib.error
 import urllib.request
 from contextlib import contextmanager
 from urllib.parse import urlsplit
@@ -95,7 +96,10 @@ def validate_public_url(url: str) -> None:
 
 
 def http_get(
-    url: str, accept: str = "text/html", cookie_profile: str | None = None
+    url: str,
+    accept: str = "text/html",
+    cookie_profile: str | None = None,
+    impersonate: str | None = None,
 ) -> tuple[str, str]:
     """Fetch a URL and return (body_text, content_type).
 
@@ -103,6 +107,11 @@ def http_get(
     this URL and present as Firefox. That carries a session established in a
     real browser without running any page JavaScript, which is what gets past
     stacks that reject WebDriver sessions outright. See webextract.cookies.
+
+    With `impersonate`, the request goes out through curl_cffi so the TLS and
+    HTTP/2 handshakes match that browser too. Python's own handshake is
+    unmistakably not a browser's, which some protection stacks check against
+    the User-Agent. Needs the optional curl_cffi dependency.
     """
     validate_public_url(url)
     headers = {"User-Agent": USER_AGENT, "Accept": accept}
@@ -114,10 +123,35 @@ def http_get(
         jar = cookie_header(cookie_profile, url)
         if jar:
             headers["Cookie"] = jar
+    if impersonate:
+        return _impersonated_get(url, headers, impersonate)
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
         return resp.read().decode(charset, errors="replace"), resp.headers.get_content_type()
+
+
+def _impersonated_get(
+    url: str, headers: dict[str, str], impersonate: str
+) -> tuple[str, str]:
+    """http_get's body for the curl_cffi path. Raises HTTPError on 4xx/5xx so
+    callers can treat blocks identically to the urllib path."""
+    try:
+        from curl_cffi import requests as cffi_requests
+    except ImportError as e:  # optional dependency
+        raise RuntimeError(
+            "impersonate requires the curl_cffi package (pip install curl_cffi)"
+        ) from e
+
+    resp = cffi_requests.get(
+        url, headers=headers, impersonate=impersonate, timeout=45
+    )
+    if resp.status_code >= 400:
+        raise urllib.error.HTTPError(
+            url, resp.status_code, resp.reason or "", resp.headers, None
+        )
+    ctype = (resp.headers.get("content-type") or "text/html").split(";")[0].strip()
+    return resp.text, ctype
 
 
 # --------------------------------------------------------------------------- #

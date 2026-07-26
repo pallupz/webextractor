@@ -105,11 +105,26 @@ path, and scheme are sent, and expired ones are dropped.
 Use it for sites whose content is server-rendered but which reject automated
 browsers: browse the site normally in that profile, then fetch with this.
 
-Known limit: it does not defeat bot protection that fingerprints the TLS
-handshake (Akamai Bot Manager, as deployed on domain.com.au, does). Python's
-handshake does not look like Firefox's no matter which cookies or User-Agent
-the request carries, so those sites answer 403. Verified 2026-07-26 against
-domain.com.au with cookies seconds old; realestate.com.au works fine.
+Python's own TLS handshake is unmistakably not a browser's, and some stacks
+check that against the User-Agent. `--impersonate TARGET` (MCP: `impersonate`)
+sends the request through [curl_cffi](https://github.com/lexiforest/curl_cffi)
+so the TLS and HTTP/2 handshakes match a real browser too — pair it with
+`--cookies-from` and name the browser the cookies came from:
+
+```bash
+webextract --cookies-from ~/.mozilla/firefox/logged-in --impersonate firefox135 URL
+```
+
+`curl_cffi` is an optional dependency; without it, `--impersonate` errors and
+the other paths are unaffected.
+
+Note that none of this beats a stack that has already decided against you.
+Akamai records its verdict in the `_abck` cookie (`~-1~` = rejected), and once
+a client is in that state every request 403s regardless of handshake or cookie
+freshness — including from an ordinary browser. Reputation is per client and
+recovers slowly, so a burst of failed attempts makes things durably worse.
+Diagnose before iterating: if `_abck` reads `~-1~` after a genuine browser
+visit, the request shape is not what is wrong.
 
 Remote HTTP servers ignore this argument, exactly as they ignore `--profile`,
 so a remote caller can never read the host's cookie jars.

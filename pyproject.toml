@@ -16,6 +16,8 @@ dependencies = [
 # Plain-HTTP extraction works with no third-party deps; selenium is only
 # needed for --firefox / --profile (JS rendering, bot-blocked pages).
 mcp = ["mcp>=1.2"]
+# Browser TLS/HTTP2 handshakes for --impersonate.
+impersonate = ["curl_cffi>=0.7"]
 dev = ["pytest>=7"]
 
 [tool.pytest.ini_options]

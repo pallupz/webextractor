@@ -26,7 +26,11 @@ class GenericExtractor(Extractor):
             html, content_type = render_page_source(url, self.resolve_browser(opts))
         else:
             try:
-                html, content_type = http_get(url, cookie_profile=opts.cookie_profile)
+                html, content_type = http_get(
+                    url,
+                    cookie_profile=opts.cookie_profile,
+                    impersonate=opts.impersonate,
+                )
             except HTTPError as e:
                 if e.code in (401, 403, 405, 406, 429) or e.code >= 500:
                     hint = (
