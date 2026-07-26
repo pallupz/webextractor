@@ -26,13 +26,18 @@ class GenericExtractor(Extractor):
             html, content_type = render_page_source(url, self.resolve_browser(opts))
         else:
             try:
-                html, content_type = http_get(url)
+                html, content_type = http_get(url, cookie_profile=opts.cookie_profile)
             except HTTPError as e:
                 if e.code in (401, 403, 405, 406, 429) or e.code >= 500:
-                    raise RuntimeError(
-                        f"plain HTTP fetch was blocked (HTTP {e.code}); "
+                    hint = (
+                        "the profile's session may have expired; re-establish it "
+                        "in a real browser and retry"
+                        if opts.cookie_profile else
                         "retry with use_browser=true (--browser firefox) to "
                         "render in a real browser"
+                    )
+                    raise RuntimeError(
+                        f"plain HTTP fetch was blocked (HTTP {e.code}); {hint}"
                     ) from e
                 raise
         title, text = html_to_markdown(html)

@@ -92,6 +92,28 @@ Note: for Reddit, prefer Firefox; Reddit's bot detection blocks headless Chrome
 more aggressively, so the rendered DOM often comes back empty there. The Reddit
 extractor auto-selects Firefox for this reason.
 
+### Borrowing a profile's cookies without a browser
+
+`--cookies-from PROFILE` (MCP: `cookies_from_profile`) attaches the cookies a
+local Firefox profile holds for the URL to a plain HTTP fetch. No browser
+starts and no page JavaScript runs, so it is much faster and far lighter on the
+origin than `--browser`. Unlike `--profile` it does not imply a browser, and it
+works while that profile is open in a running Firefox (the cookie db is copied
+before reading, never written to). Only cookies scoped to the requested host,
+path, and scheme are sent, and expired ones are dropped.
+
+Use it for sites whose content is server-rendered but which reject automated
+browsers: browse the site normally in that profile, then fetch with this.
+
+Known limit: it does not defeat bot protection that fingerprints the TLS
+handshake (Akamai Bot Manager, as deployed on domain.com.au, does). Python's
+handshake does not look like Firefox's no matter which cookies or User-Agent
+the request carries, so those sites answer 403. Verified 2026-07-26 against
+domain.com.au with cookies seconds old; realestate.com.au works fine.
+
+Remote HTTP servers ignore this argument, exactly as they ignore `--profile`,
+so a remote caller can never read the host's cookie jars.
+
 ### Amazon
 
 Amazon product, listing and search pages get a dedicated structured extractor.

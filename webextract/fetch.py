@@ -94,12 +94,27 @@ def validate_public_url(url: str) -> None:
         raise ValueError(f"refusing to fetch private/internal host: {parts.hostname}")
 
 
-def http_get(url: str, accept: str = "text/html") -> tuple[str, str]:
-    """Fetch a URL and return (body_text, content_type)."""
+def http_get(
+    url: str, accept: str = "text/html", cookie_profile: str | None = None
+) -> tuple[str, str]:
+    """Fetch a URL and return (body_text, content_type).
+
+    With `cookie_profile`, attach the cookies a local Firefox profile holds for
+    this URL and present as Firefox. That carries a session established in a
+    real browser without running any page JavaScript, which is what gets past
+    stacks that reject WebDriver sessions outright. See webextract.cookies.
+    """
     validate_public_url(url)
-    req = urllib.request.Request(
-        url, headers={"User-Agent": USER_AGENT, "Accept": accept}
-    )
+    headers = {"User-Agent": USER_AGENT, "Accept": accept}
+    if cookie_profile:
+        from .cookies import FIREFOX_USER_AGENT, cookie_header
+
+        headers["User-Agent"] = FIREFOX_USER_AGENT
+        headers["Accept-Language"] = "en-US,en;q=0.9"
+        jar = cookie_header(cookie_profile, url)
+        if jar:
+            headers["Cookie"] = jar
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
         return resp.read().decode(charset, errors="replace"), resp.headers.get_content_type()

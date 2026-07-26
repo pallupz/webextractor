@@ -46,6 +46,7 @@ def fetch_page(
     use_browser: bool = False,
     browser: str = "",
     profile: str = "",
+    cookies_from_profile: str = "",
     max_items: int = 50,
     scroll: bool = False,
 ) -> str:
@@ -64,6 +65,12 @@ def fetch_page(
         profile: Name of a logged-in browser profile to reuse (local servers
             only; ignored when the server runs over HTTP). Defaults to the
             WEBEXTRACT_PROFILE env var if set.
+        cookies_from_profile: Name or path of a Firefox profile whose cookies
+            should be attached to a plain, JavaScript-free HTTP fetch (local
+            servers only). Use for sites that reject automated browsers even
+            with a valid session: browse the site in that profile first, then
+            fetch with this. Does not start a browser, so it is also much
+            lighter on the site than use_browser.
         max_items: Cap on list-like content such as comments.
         scroll: Load more lazily-rendered content by scrolling to the bottom
             until the page stops growing. On sites with a dedicated extractor
@@ -82,6 +89,9 @@ def fetch_page(
         render=use_browser,        # force a browser; engine auto unless named
         browser=(browser or None),
         profile=effective_profile,
+        # Same reasoning as `profile`: a remote caller must never be able to
+        # read this machine's cookie jars.
+        cookie_profile=(None if _REMOTE else (cookies_from_profile or None)),
         persist_profile=not _REMOTE,
         max_items=max_items,
         scroll=scroll,

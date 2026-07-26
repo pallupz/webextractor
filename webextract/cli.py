@@ -28,6 +28,13 @@ def main(argv: list[str] | None = None) -> int:
         "default-context cookies apply.",
     )
     ap.add_argument(
+        "--cookies-from", dest="cookies_from", metavar="PROFILE",
+        help="attach a Firefox profile's cookies to a plain HTTP fetch, without "
+        "starting a browser. Carries a session established by real browsing "
+        "while running no page JavaScript. Unlike --profile this does NOT "
+        "imply --browser, and it can be used while that profile is open.",
+    )
+    ap.add_argument(
         "--no-headless", dest="headless", action="store_false",
         help="show the browser window instead of running headless",
     )
@@ -67,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         browser=args.browser,  # None = auto; --scroll/--profile still imply a browser
         headless=args.headless,
         profile=args.profile,
+        cookie_profile=args.cookies_from,
         wait=args.wait,
         max_items=args.max_items,
         scroll=args.scroll,

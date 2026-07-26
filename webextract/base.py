@@ -23,6 +23,10 @@ class FetchOptions:
     persist_profile: bool = True   # reuse the tool's own browser profile when
     #                                no profile is named, so cookies/trust build
     #                                up across runs (set False for a throwaway)
+    cookie_profile: str | None = None  # Firefox profile whose cookies to attach
+    #                                to a plain HTTP fetch. Deliberately does NOT
+    #                                imply a browser: the point is to carry a
+    #                                real session with no JavaScript running.
 
     @property
     def use_browser(self) -> bool:
