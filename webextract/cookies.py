@@ -30,14 +30,17 @@ FIREFOX_USER_AGENT = (
 
 
 def _profile_dir(profile: str) -> str:
-    """Resolve a profile path or bare name to a directory containing cookies.sqlite."""
-    if os.path.isdir(profile):
-        return profile
-    base = os.path.expanduser("~/.mozilla/firefox")
-    candidate = os.path.join(base, profile)
-    if os.path.isdir(candidate):
-        return candidate
-    raise ValueError(f"could not find Firefox profile: {profile}")
+    """Resolve a profile path or bare name to a directory containing cookies.sqlite.
+
+    Delegates to the Firefox backend's resolver so --cookies-from accepts the
+    same names as --profile (path, dir name, profiles.ini Name=, display name).
+    """
+    from .browsers.firefox import resolve_profile
+
+    try:
+        return resolve_profile(profile)
+    except FileNotFoundError as exc:
+        raise ValueError(str(exc)) from None
 
 
 def _host_matches(cookie_host: str, host: str) -> bool:

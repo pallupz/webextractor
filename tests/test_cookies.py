@@ -92,6 +92,45 @@ def test_missing_profile_errors(tmp_path):
         cookies.cookies_for(str(tmp_path / "nope"), "https://example.com/")
 
 
+def test_bare_name_resolves_like_browser_profiles(tmp_path, monkeypatch):
+    """--cookies-from resolves bare names the same way --profile does."""
+    from webextract.browsers import firefox
+
+    base = tmp_path / "Firefox"
+    (base / "Profiles").mkdir(parents=True)
+    make_profile(base / "Profiles", [(".example.com", "/", "a", "1", FUTURE, 1)])
+    monkeypatch.setattr(firefox, "FIREFOX_BASES", [str(base)])
+    assert cookies.cookies_for("logged-in", "https://example.com/") == {"a": "1"}
+
+
+def test_display_name_resolves_via_profile_groups_db(tmp_path, monkeypatch):
+    """Names from the in-app profile manager (Profile Groups DB) work too."""
+    from webextract.browsers import firefox
+
+    base = tmp_path / "Firefox"
+    (base / "Profiles").mkdir(parents=True)
+    make_profile(base / "Profiles", [(".example.com", "/", "a", "1", FUTURE, 1)])
+    groups = base / "Profile Groups"
+    groups.mkdir()
+    con = sqlite3.connect(groups / "g.sqlite")
+    con.execute("create table Profiles (name text, path text)")
+    con.execute(
+        "insert into Profiles values (?, ?)", ("soha-logged-in", "Profiles/logged-in")
+    )
+    con.commit()
+    con.close()
+    monkeypatch.setattr(firefox, "FIREFOX_BASES", [str(base)])
+    assert cookies.cookies_for("soha-logged-in", "https://example.com/") == {"a": "1"}
+
+
+def test_missing_bare_name_errors_with_valueerror(tmp_path, monkeypatch):
+    from webextract.browsers import firefox
+
+    monkeypatch.setattr(firefox, "FIREFOX_BASES", [str(tmp_path)])
+    with pytest.raises(ValueError):
+        cookies.cookies_for("no-such-profile", "https://example.com/")
+
+
 def test_cookie_header_format(tmp_path):
     prof = make_profile(tmp_path, [
         (".example.com", "/", "a", "1", FUTURE, 0),
