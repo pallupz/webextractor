@@ -22,6 +22,14 @@ from . import extract, get_extractor
 # (e.g. WEBEXTRACT_PROFILE=logged-in). Only meaningful for local servers.
 DEFAULT_PROFILE = os.environ.get("WEBEXTRACT_PROFILE") or None
 
+# Values a caller passes as `profile` to mean "no profile at all", overriding
+# DEFAULT_PROFILE. An empty string cannot carry that meaning: it is the argument
+# default, so it has to keep falling back to the env var. Without an explicit
+# opt-out, setting WEBEXTRACT_PROFILE forces a browser render on *every* call -
+# and since profiles are single-instance locked, a profile that is open in the
+# user's own browser then makes every call hang instead of fetching.
+NO_PROFILE = frozenset({"none", "-", "off"})
+
 # Set true when serving over HTTP. A remote caller must not be able to drive the
 # server's logged-in Firefox profiles (cookie/session exfiltration), so the
 # profile argument and WEBEXTRACT_PROFILE are ignored in that mode - and the
@@ -63,7 +71,11 @@ def fetch_page(
             Firefox). Only applies when use_browser/scroll/profile request one.
         profile: Name of a logged-in browser profile to reuse (local servers
             only; ignored when the server runs over HTTP). Defaults to the
-            WEBEXTRACT_PROFILE env var if set.
+            WEBEXTRACT_PROFILE env var if set. Pass "none" to opt out of that
+            default and take the plain HTTP path - worth doing for any page
+            that does not need a logged-in session, since a profile forces a
+            browser render and will block if that profile is already open in
+            your own browser.
         max_items: Cap on list-like content such as comments.
         scroll: Load more lazily-rendered content by scrolling to the bottom
             until the page stops growing. On sites with a dedicated extractor
@@ -76,7 +88,10 @@ def fetch_page(
     """
     # Never honor a caller-supplied (or env) profile when reachable remotely,
     # and keep remote renders stateless (no shared persistent cookie jar).
-    effective_profile = None if _REMOTE else (profile or DEFAULT_PROFILE)
+    if _REMOTE or profile.strip().lower() in NO_PROFILE:
+        effective_profile = None
+    else:
+        effective_profile = profile or DEFAULT_PROFILE
     data = extract(
         url,
         render=use_browser,        # force a browser; engine auto unless named

@@ -25,6 +25,19 @@ class Browser:
         return False
 
 
+def stop_quietly(service) -> None:
+    """Stop a driver Service, swallowing teardown errors.
+
+    Used when a browser launch fails partway: the driver process is already
+    running but no driver object exists to quit, and a teardown error must not
+    replace the real launch failure.
+    """
+    try:
+        service.stop()
+    except Exception:
+        pass
+
+
 _BROWSERS: dict[str, Browser] = {}
 
 
