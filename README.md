@@ -39,9 +39,12 @@ dedicated extractors that return structured fields.
 ## Install
 
 ```bash
-python -m venv .venv
-.venv/bin/pip install -e .          # installs selenium + the `webextract` command
+uv sync                             # selenium + the `webextract` command
+uv sync --extra mcp                 # ... and the MCP server
 ```
+
+The `mcp` extra is opt-in: plain-HTTP extraction needs no third-party packages,
+so the MCP server's dependencies are only pulled in when you ask for them.
 
 ## Usage
 
@@ -133,14 +136,18 @@ browser processes are left behind.
 
 ## MCP server
 
-Exposes a `fetch_page` tool so an AI client can use this as a fallback when its
-own web fetch fails or is blocked. Install the extra and run:
+Runs over stdio via the `webextract-mcp` entry point. Exposes a `fetch_page`
+tool so an AI client can use this as a fallback when its own web fetch fails or
+is blocked.
 
 ```bash
-.venv/bin/pip install -e ".[mcp]"
-webextract-mcp                 # stdio (Claude Desktop, Claude Code)
-webextract-mcp --http          # streamable HTTP at http://127.0.0.1:8000/mcp
+uv sync --extra mcp
+uv run --extra mcp webextract-mcp            # stdio (Claude Desktop, Claude Code)
+uv run --extra mcp webextract-mcp --http     # streamable HTTP at http://127.0.0.1:8000/mcp
 ```
+
+`--extra mcp` is needed on every `uv run` here, not just the sync: `mcp` is an
+optional dependency, and a bare `uv run` resyncs the environment without it.
 
 Set `WEBEXTRACT_PROFILE=logged-in` in the server env to default the Firefox
 profile (local servers only).
@@ -148,10 +155,12 @@ profile (local servers only).
 **Claude Code** (stdio):
 
 ```bash
-claude mcp add webextract -s user \
+claude mcp add --scope user webextract \
   -e WEBEXTRACT_PROFILE=logged-in \
-  -- /Users/pallupz/personal/webextractor/.venv/bin/webextract-mcp
+  -- uv --directory /Users/pallupz/personal/webextractor run --extra mcp webextract-mcp
 ```
+
+Remove with `claude mcp remove webextract -s user`.
 
 **Claude Desktop** - add to
 `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -160,7 +169,8 @@ claude mcp add webextract -s user \
 {
   "mcpServers": {
     "webextract": {
-      "command": "/Users/pallupz/personal/webextractor/.venv/bin/webextract-mcp",
+      "command": "uv",
+      "args": ["--directory", "/Users/pallupz/personal/webextractor", "run", "--extra", "mcp", "webextract-mcp"],
       "env": { "WEBEXTRACT_PROFILE": "logged-in" }
     }
   }
@@ -269,3 +279,10 @@ browser-agnostic and needs no changes.
 `selenium` (for `--browser`/`--profile`/`--scroll`) and a local install of the
 chosen browser (Firefox and/or Chrome). The matching driver (geckodriver or
 chromedriver) is fetched automatically by Selenium Manager.
+
+## Tests
+
+```bash
+uv sync --extra mcp --extra dev
+uv run --extra mcp --extra dev pytest
+```
