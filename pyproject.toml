@@ -15,7 +15,9 @@ dependencies = [
 [project.optional-dependencies]
 # Plain-HTTP extraction works with no third-party deps; selenium is only
 # needed for --firefox / --profile (JS rendering, bot-blocked pages).
-mcp = ["mcp>=1.2"]
+# mcp 2.x imports `cryptography`, whose wheel fails to load on this machine
+# (missing _BIO_ADDR_free); 1.x matches the other personal MCP servers.
+mcp = ["mcp>=1.2,<2"]
 dev = ["pytest>=7"]
 
 [tool.pytest.ini_options]
