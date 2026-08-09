@@ -150,7 +150,10 @@ uv run --extra mcp webextract-mcp --http     # streamable HTTP at http://127.0.0
 optional dependency, and a bare `uv run` resyncs the environment without it.
 
 Set `WEBEXTRACT_PROFILE=logged-in` in the server env to default the Firefox
-profile (local servers only).
+profile (local servers only). That default applies to *every* call, and a
+profile forces a browser render, so pass `profile: "none"` for any page that
+does not need the session - otherwise a profile already open in your own
+browser makes the call block on the single-instance lock rather than fetch.
 
 **Claude Code** (stdio):
 

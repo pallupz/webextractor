@@ -88,3 +88,31 @@ def test_browser_choice_forwarded(monkeypatch, capture_extract):
     monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", None)
     mcp_server.fetch_page("https://x.com", use_browser=True, browser="chrome")
     assert capture_extract["browser"] == "chrome"
+
+
+@pytest.mark.parametrize("sentinel", ["none", "None", " none ", "-", "off"])
+def test_profile_none_opts_out_of_the_env_default(
+    monkeypatch, capture_extract, sentinel
+):
+    """Without this, WEBEXTRACT_PROFILE forces a browser render on every call,
+    and a profile already open in the user's own browser hangs the fetch."""
+    monkeypatch.setattr(mcp_server, "_REMOTE", False)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", "logged-in")
+    mcp_server.fetch_page("https://x.com", profile=sentinel)
+    assert capture_extract["profile"] is None
+
+
+def test_empty_profile_still_falls_back_to_the_default(monkeypatch, capture_extract):
+    """The empty string is the argument default, so it cannot mean "no profile"
+    without silently breaking the env-var convention."""
+    monkeypatch.setattr(mcp_server, "_REMOTE", False)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", "logged-in")
+    mcp_server.fetch_page("https://x.com", profile="")
+    assert capture_extract["profile"] == "logged-in"
+
+
+def test_opting_out_does_not_force_a_browser(monkeypatch, capture_extract):
+    monkeypatch.setattr(mcp_server, "_REMOTE", False)
+    monkeypatch.setattr(mcp_server, "DEFAULT_PROFILE", "logged-in")
+    mcp_server.fetch_page("https://x.com", profile="none")
+    assert capture_extract["render"] is False

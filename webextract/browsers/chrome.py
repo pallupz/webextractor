@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 
-from .base import Browser, register
+from .base import Browser, register, stop_quietly
 
 # macOS Chrome data directory (the default --user-data-dir).
 CHROME_BASE = os.path.expanduser("~/Library/Application Support/Google/Chrome")
@@ -67,6 +67,7 @@ class ChromeBrowser(Browser):
         """
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
 
         opts = Options()
         if headless:
@@ -76,6 +77,14 @@ class ChromeBrowser(Browser):
             user_data_dir, profile_dir = resolved
             opts.add_argument(f"--user-data-dir={user_data_dir}")
             opts.add_argument(f"--profile-directory={profile_dir}")
-        driver = webdriver.Chrome(options=opts)
-        driver.set_page_load_timeout(60)
-        return driver
+
+        # See the Firefox driver for why the Service is owned here: a launch
+        # that fails after chromedriver starts would otherwise orphan it.
+        service = Service()
+        try:
+            driver = webdriver.Chrome(options=opts, service=service)
+            driver.set_page_load_timeout(60)
+            return driver
+        except BaseException:
+            stop_quietly(service)
+            raise
