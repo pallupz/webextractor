@@ -17,6 +17,7 @@ import os
 from mcp.server.fastmcp import FastMCP
 
 from . import extract, get_extractor
+from ._version import __version__
 
 # A default Firefox profile can be set via env so the client config stays simple
 # (e.g. WEBEXTRACT_PROFILE=logged-in). Only meaningful for local servers.
@@ -44,8 +45,12 @@ mcp = FastMCP(
         "browsing fails, is blocked (HTTP 403/429), times out, or returns empty "
         "or JavaScript-only content. Returns readable page content as markdown, "
         "with links and images preserved as references."
+        f"\n\n(webextract {__version__})"
     ),
 )
+
+# FastMCP takes no version; without this the handshake reports mcp's own.
+mcp._mcp_server.version = __version__
 
 
 @mcp.tool()

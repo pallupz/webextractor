@@ -283,6 +283,26 @@ browser-agnostic and needs no changes.
 chosen browser (Firefox and/or Chrome). The matching driver (geckodriver or
 chromedriver) is fetched automatically by Selenium Manager.
 
+## Versioning
+
+The server reports a build id: the `version` in `pyproject.toml` plus the commit
+it is actually running from, e.g. `0.2.0+g1a2b3c4`, with `-dirty` appended when
+the checkout has uncommitted edits. It appears twice, so a client can always
+tell which build answered it:
+
+- `serverInfo.version` in the MCP handshake.
+- The last line of the server instructions, which the model sees every session.
+
+**Bump `version` in `pyproject.toml` whenever behaviour changes**, and tag the
+release to match (`git tag -a v0.3.0 && git push --tags`). The commit half is
+resolved at import time and needs no upkeep; the number is the hand-maintained
+part, and without a bump two different builds can only be told apart by sha.
+
+Both halves are read at import time from the checkout the code is running from,
+so a `git pull` on the gateway box is enough; no reinstall is needed for the
+number to follow. Installed package metadata is only the fallback for a
+non-checkout install.
+
 ## Tests
 
 ```bash
