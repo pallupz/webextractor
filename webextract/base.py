@@ -23,6 +23,15 @@ class FetchOptions:
     persist_profile: bool = True   # reuse the tool's own browser profile when
     #                                no profile is named, so cookies/trust build
     #                                up across runs (set False for a throwaway)
+    impersonate: str | None = None  # curl_cffi browser target ("firefox135",
+    #                                "chrome131", ...) for the plain HTTP path,
+    #                                so the TLS/HTTP2 handshake matches the
+    #                                browser the cookies came from. Requires the
+    #                                optional curl_cffi dependency.
+    cookie_profile: str | None = None  # Firefox profile whose cookies to attach
+    #                                to a plain HTTP fetch. Deliberately does NOT
+    #                                imply a browser: the point is to carry a
+    #                                real session with no JavaScript running.
 
     @property
     def use_browser(self) -> bool:

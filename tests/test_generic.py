@@ -17,7 +17,7 @@ def _http_error(code):
 
 @pytest.mark.parametrize("code", [403, 429, 401, 503])
 def test_block_suggests_browser(monkeypatch, code):
-    def boom(url, accept="text/html"):
+    def boom(url, accept="text/html", cookie_profile=None, impersonate=None):
         raise _http_error(code)
     monkeypatch.setattr(generic_mod, "http_get", boom)
     with pytest.raises(RuntimeError, match="use_browser=true"):
@@ -25,7 +25,7 @@ def test_block_suggests_browser(monkeypatch, code):
 
 
 def test_non_block_http_error_propagates(monkeypatch):
-    def boom(url, accept="text/html"):
+    def boom(url, accept="text/html", cookie_profile=None, impersonate=None):
         raise _http_error(404)
     monkeypatch.setattr(generic_mod, "http_get", boom)
     with pytest.raises(HTTPError):
@@ -35,7 +35,7 @@ def test_non_block_http_error_propagates(monkeypatch):
 def test_plain_fetch_returns_markdown(monkeypatch):
     monkeypatch.setattr(
         generic_mod, "http_get",
-        lambda url, accept="text/html": (
+        lambda url, accept="text/html", cookie_profile=None, impersonate=None: (
             "<title>T</title><body><p>Hi</p></body>", "text/html"
         ),
     )

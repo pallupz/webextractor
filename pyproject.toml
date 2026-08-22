@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "webextract"
-version = "0.2.0"
+version = "0.3.0"
 description = "Extract readable content (text + media references) from webpages"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,6 +18,8 @@ dependencies = [
 # mcp 2.x imports `cryptography`, whose wheel fails to load on this machine
 # (missing _BIO_ADDR_free); 1.x matches the other personal MCP servers.
 mcp = ["mcp>=1.2,<2"]
+# Browser TLS/HTTP2 handshakes for --impersonate.
+impersonate = ["curl_cffi>=0.7"]
 dev = ["pytest>=7"]
 
 [tool.pytest.ini_options]

@@ -95,6 +95,43 @@ Note: for Reddit, prefer Firefox; Reddit's bot detection blocks headless Chrome
 more aggressively, so the rendered DOM often comes back empty there. The Reddit
 extractor auto-selects Firefox for this reason.
 
+### Borrowing a profile's cookies without a browser
+
+`--cookies-from PROFILE` (MCP: `cookies_from_profile`) attaches the cookies a
+local Firefox profile holds for the URL to a plain HTTP fetch. No browser
+starts and no page JavaScript runs, so it is much faster and far lighter on the
+origin than `--browser`. Unlike `--profile` it does not imply a browser, and it
+works while that profile is open in a running Firefox (the cookie db is copied
+before reading, never written to). Only cookies scoped to the requested host,
+path, and scheme are sent, and expired ones are dropped.
+
+Use it for sites whose content is server-rendered but which reject automated
+browsers: browse the site normally in that profile, then fetch with this.
+
+Python's own TLS handshake is unmistakably not a browser's, and some stacks
+check that against the User-Agent. `--impersonate TARGET` (MCP: `impersonate`)
+sends the request through [curl_cffi](https://github.com/lexiforest/curl_cffi)
+so the TLS and HTTP/2 handshakes match a real browser too — pair it with
+`--cookies-from` and name the browser the cookies came from:
+
+```bash
+webextract --cookies-from ~/.mozilla/firefox/logged-in --impersonate firefox135 URL
+```
+
+`curl_cffi` is an optional dependency; without it, `--impersonate` errors and
+the other paths are unaffected.
+
+Note that none of this beats a stack that has already decided against you.
+Akamai records its verdict in the `_abck` cookie (`~-1~` = rejected), and once
+a client is in that state every request 403s regardless of handshake or cookie
+freshness — including from an ordinary browser. Reputation is per client and
+recovers slowly, so a burst of failed attempts makes things durably worse.
+Diagnose before iterating: if `_abck` reads `~-1~` after a genuine browser
+visit, the request shape is not what is wrong.
+
+Remote HTTP servers ignore this argument, exactly as they ignore `--profile`,
+so a remote caller can never read the host's cookie jars.
+
 ### Amazon
 
 Amazon product, listing and search pages get a dedicated structured extractor.

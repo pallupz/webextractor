@@ -6,8 +6,11 @@ import os
 
 from .base import Browser, register, stop_quietly
 
-# macOS Firefox data directory (profiles live under here).
-FIREFOX_BASE = os.path.expanduser("~/Library/Application Support/Firefox")
+# Firefox data directories (profiles live under here): macOS, then Linux.
+FIREFOX_BASES = [
+    os.path.expanduser("~/Library/Application Support/Firefox"),
+    os.path.expanduser("~/.mozilla/firefox"),
+]
 
 
 def resolve_profile(profile: str | None) -> str | None:
@@ -16,42 +19,45 @@ def resolve_profile(profile: str | None) -> str | None:
     Accepts a full path, a profile directory name, a profiles.ini Name=, or a
     display name from the newer in-app profile manager (Profile Groups DB).
     """
-    import configparser
-
     if not profile:
         return None
     if os.path.isdir(profile):
         return profile
+    for base in FIREFOX_BASES:
+        full = _resolve_in_base(profile, base)
+        if full:
+            return full
+    raise FileNotFoundError(f"could not find Firefox profile: {profile}")
 
-    profiles_dir = os.path.join(FIREFOX_BASE, "Profiles")
-    candidate = os.path.join(profiles_dir, profile)
-    if os.path.isdir(candidate):
-        return candidate
 
-    ini = os.path.join(FIREFOX_BASE, "profiles.ini")
+def _resolve_in_base(profile: str, base: str) -> str | None:
+    import configparser
+
+    # macOS keeps profiles under Profiles/; Linux keeps them directly in base.
+    for candidate in (os.path.join(base, "Profiles", profile), os.path.join(base, profile)):
+        if os.path.isdir(candidate):
+            return candidate
+
+    ini = os.path.join(base, "profiles.ini")
     if os.path.exists(ini):
         cfg = configparser.ConfigParser()
         cfg.read(ini)
         for section in cfg.sections():
             if cfg.get(section, "Name", fallback=None) == profile:
                 path = cfg.get(section, "Path", fallback="")
-                full = path if os.path.isabs(path) else os.path.join(FIREFOX_BASE, path)
+                full = path if os.path.isabs(path) else os.path.join(base, path)
                 if os.path.isdir(full):
                     return full
 
-    full = _lookup_profile_db(profile)
-    if full:
-        return full
-
-    raise FileNotFoundError(f"could not find Firefox profile: {profile}")
+    return _lookup_profile_db(profile, base)
 
 
-def _lookup_profile_db(name: str) -> str | None:
+def _lookup_profile_db(name: str, base: str) -> str | None:
     """Map a profile display name to its dir via the Profile Groups DB."""
     import glob
     import sqlite3
 
-    for db in glob.glob(os.path.join(FIREFOX_BASE, "Profile Groups", "*.sqlite")):
+    for db in glob.glob(os.path.join(base, "Profile Groups", "*.sqlite")):
         try:
             con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
             try:
@@ -64,7 +70,7 @@ def _lookup_profile_db(name: str) -> str | None:
             continue
         if row:
             path = row[0]
-            full = path if os.path.isabs(path) else os.path.join(FIREFOX_BASE, path)
+            full = path if os.path.isabs(path) else os.path.join(base, path)
             if os.path.isdir(full):
                 return full
     return None
@@ -86,6 +92,8 @@ class FirefoxBrowser(Browser):
         are single-instance locked), and only its default (No Container)
         context's cookies are visible to automation.
         """
+        import shutil
+
         from selenium import webdriver
         from selenium.webdriver.firefox.options import Options
         from selenium.webdriver.firefox.service import Service
@@ -104,7 +112,10 @@ class FirefoxBrowser(Browser):
         # Firefox is the usual cause - no driver object is ever returned and
         # browser_session's finally has nothing to quit. Without this, every
         # such attempt orphans a geckodriver process.
-        service = Service()
+        # A geckodriver already on PATH also beats Selenium Manager, which has
+        # no binary for linux-aarch64 and fails outright there.
+        gecko = shutil.which("geckodriver")
+        service = Service(executable_path=gecko) if gecko else Service()
         try:
             driver = webdriver.Firefox(options=opts, service=service)
             driver.set_page_load_timeout(60)
