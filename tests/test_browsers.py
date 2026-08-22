@@ -131,8 +131,9 @@ def _fake_webdriver(monkeypatch, module_attr):
         def set_page_load_timeout(self, n):
             captured["timeout"] = n
 
-    def fake_ctor(options=None, service=None):
+    def fake_ctor(options=None, service=None, **kwargs):
         captured["args"] = list(options.arguments)
+        captured["service"] = service
         return FakeDriver()
 
     monkeypatch.setattr(webdriver, module_attr, fake_ctor)

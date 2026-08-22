@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from .base import Browser, register
+from .base import Browser, register, stop_quietly
 
 # Firefox data directories (profiles live under here): macOS, then Linux.
 FIREFOX_BASES = [
@@ -105,10 +105,21 @@ class FirefoxBrowser(Browser):
         if profile_dir:
             opts.add_argument("-profile")
             opts.add_argument(profile_dir)
-        # A geckodriver already on PATH beats Selenium Manager, which has no
-        # binary for linux-aarch64 and fails outright there.
+
+        # Own the Service so a failed launch can still be cleaned up. Selenium
+        # starts geckodriver first and only then waits for the browser, so if
+        # the browser never comes up - a profile already open in a running
+        # Firefox is the usual cause - no driver object is ever returned and
+        # browser_session's finally has nothing to quit. Without this, every
+        # such attempt orphans a geckodriver process.
+        # A geckodriver already on PATH also beats Selenium Manager, which has
+        # no binary for linux-aarch64 and fails outright there.
         gecko = shutil.which("geckodriver")
-        service = Service(executable_path=gecko) if gecko else None
-        driver = webdriver.Firefox(options=opts, service=service)
-        driver.set_page_load_timeout(60)
-        return driver
+        service = Service(executable_path=gecko) if gecko else Service()
+        try:
+            driver = webdriver.Firefox(options=opts, service=service)
+            driver.set_page_load_timeout(60)
+            return driver
+        except BaseException:
+            stop_quietly(service)
+            raise
