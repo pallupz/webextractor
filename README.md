@@ -83,6 +83,23 @@ one page at a time (fine for a personal/agentic tool, not for parallel runs).
 Turn it off per run with `--ephemeral`, globally with `WEBEXTRACT_NO_PERSIST=1`,
 or override it by pointing `--profile` at a real logged-in profile.
 
+### Browser session limits
+
+A browser render is a whole Firefox/Chrome, and a hung one outlives the call
+that started it (an MCP client that times out cannot cancel the server-side
+work). Three guards keep that bounded, each an env var:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WEBEXTRACT_MAX_BROWSERS` | `1` | Browsers alive at once per process. Others queue. |
+| `WEBEXTRACT_QUEUE_TIMEOUT` | `120` | Seconds to wait for a slot before failing with a "browser busy" error. |
+| `WEBEXTRACT_SESSION_DEADLINE` | `300` | Wall-clock cap on one render, launch to quit. Past it the browser's process tree is SIGKILLed and the call fails with "session exceeded". |
+| `WEBEXTRACT_QUIT_TIMEOUT` | `20` | Seconds `driver.quit()` gets before the tree is killed anyway. |
+
+The default of one browser at a time also means a shared profile can never
+hit its single-instance lock from within one process. Raise it on a machine
+with the RAM for parallel renders (each is 300 MB+ before the page loads).
+
 `--browser` renders the page in a real browser (Firefox or Chrome) to run
 JavaScript and get past bot blocks, and combines with `--profile`
 (e.g. `--browser chrome --profile Work`). `--profile` and `--scroll` also imply
