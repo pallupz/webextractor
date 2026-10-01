@@ -101,5 +101,63 @@ def test_dom_extract_raises_when_no_post(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="post content"):
         RedditExtractor().extract(
-            "https://www.reddit.com/r/x/", FetchOptions(browser="firefox")
+            "https://www.reddit.com/r/x/comments/1/t/", FetchOptions(browser="firefox")
         )
+
+
+def test_listing_dom_keeps_query_and_maps_old_reddit(monkeypatch):
+    captured = {}
+
+    def fake_exec(url, opts, script, **kwargs):
+        captured["url"] = url
+        return {"title": "culburra - Reddit Search!", "posts": [
+            {"title": "A", "url": "https://www.reddit.com/r/x/comments/1/a/", "score": 6},
+            {"title": "A", "url": "https://www.reddit.com/r/x/comments/1/a/"},  # dupe
+            {"title": "B", "url": "https://www.reddit.com/r/y/comments/2/b/"},
+        ]}
+
+    monkeypatch.setattr(reddit_mod, "render_execute", fake_exec)
+    data = RedditExtractor().extract(
+        "https://old.reddit.com/search?q=culburra&sort=relevance&t=all",
+        FetchOptions(browser="firefox"),
+    )
+    assert captured["url"] == "https://www.reddit.com/search?q=culburra&sort=relevance&t=all"
+    assert data["type"] == "reddit_listing"
+    assert [p["title"] for p in data["posts"]] == ["A", "B"]
+    out = RedditExtractor().render(data)
+    assert "1. A" in out and "score 6" in out and "2. B" in out
+
+
+def test_listing_dom_empty_is_not_an_error(monkeypatch):
+    monkeypatch.setattr(reddit_mod, "render_execute", lambda *a, **k: {"posts": []})
+    data = RedditExtractor().extract(
+        "https://www.reddit.com/search/?q=zzzz", FetchOptions(browser="firefox")
+    )
+    assert data["posts"] == []
+    assert "No posts found" in RedditExtractor().render(data)
+
+
+def test_listing_json_parses_posts(monkeypatch):
+    captured = {}
+    payload = {"data": {"children": [
+        {"kind": "t3", "data": {
+            "title": "T", "permalink": "/r/x/comments/1/t/", "subreddit_name_prefixed": "r/x",
+            "author": "op", "created_utc": 0, "score": 4, "num_comments": 1,
+            "is_self": False, "url_overridden_by_dest": "https://example.com/",
+        }},
+        {"kind": "t5", "data": {}},  # communities in search results are skipped
+    ]}}
+
+    def fake_get(url, accept="text/html"):
+        captured["url"] = url
+        return json.dumps(payload), "application/json"
+
+    monkeypatch.setattr(reddit_mod, "http_get", fake_get)
+    data = RedditExtractor().extract(
+        "https://www.reddit.com/search/?q=culburra", FetchOptions()
+    )
+    assert captured["url"] == "https://www.reddit.com/search/.json?q=culburra"
+    (post,) = data["posts"]
+    assert post["url"] == "https://www.reddit.com/r/x/comments/1/t/"
+    assert post["link"] == "https://example.com/"
+    assert post["created"].startswith("1970-01-01")

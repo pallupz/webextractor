@@ -5,12 +5,17 @@ network security, while the JS-challenged HTML page loads fine). Reads the
 shreddit DOM into a structured post + threaded comments, keeping inline links
 and images and the post's primary media (image / gallery / video / link) as
 markdown references. Falls back to the .json API when no browser is requested.
+
+Anything that is not a post permalink (search results, subreddit and front-page
+feeds) is read as a listing: one line per post rather than a single post.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 from ..base import Extractor, FetchOptions, register
 from ..fetch import http_get, render_execute
@@ -98,6 +103,64 @@ _REDDIT_LOAD_MORE = (
     "btns.slice(0, 20).forEach(b => { try { b.click(); } catch (e) {} });"
 )
 
+# Search results render as search-post-unit blocks; feeds as shreddit-post.
+_LISTING_SELECTOR = '[data-testid="search-post-unit"], shreddit-post'
+
+_REDDIT_LISTING_SCRIPT = r"""
+const abs = h => h ? new URL(h, location.origin).href : null;
+const num = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
+const posts = [];
+for (const u of document.querySelectorAll('[data-testid="search-post-unit"]')) {
+  const a = u.querySelector('a[data-testid="post-title"]');
+  if (!a) continue;
+  let ctx = {};
+  try {
+    const t = u.querySelector('search-telemetry-tracker');
+    ctx = JSON.parse(t.getAttribute('data-faceplate-tracking-context')) || {};
+  } catch (e) {}
+  const ts = u.querySelector('faceplate-timeago');
+  const counts = [...u.querySelectorAll('[data-testid="search-counter-row"] faceplate-number')]
+    .map(n => num(n.getAttribute('number')));
+  posts.push({
+    title: (a.getAttribute('aria-label') || a.textContent).replace(/\s+/g, ' ').trim(),
+    url: abs(a.getAttribute('href')),
+    subreddit: ctx.subreddit && ctx.subreddit.name ? 'r/' + ctx.subreddit.name : null,
+    author: ctx.profile ? ctx.profile.name : null,
+    created: ts ? ts.getAttribute('ts') : null,
+    score: counts.length > 0 ? counts[0] : null,
+    num_comments: counts.length > 1 ? counts[1] : null,
+    link: null
+  });
+}
+for (const p of document.querySelectorAll('shreddit-post')) {
+  const domain = p.getAttribute('domain') || '';
+  const href = p.getAttribute('content-href');
+  posts.push({
+    title: p.getAttribute('post-title'),
+    url: abs(p.getAttribute('permalink')),
+    subreddit: p.getAttribute('subreddit-prefixed-name'),
+    author: p.getAttribute('author'),
+    created: p.getAttribute('created-timestamp'),
+    score: num(p.getAttribute('score')),
+    num_comments: num(p.getAttribute('comment-count')),
+    link: (domain && !domain.startsWith('self.') && href) ? href : null
+  });
+}
+return {title: document.title, posts};
+"""
+
+
+def _is_post(url: str) -> bool:
+    return "/comments/" in urlsplit(url).path
+
+
+def _to_www(url: str) -> str:
+    # old.reddit has a different DOM; the same paths and queries work on www.
+    parts = urlsplit(url)
+    if parts.netloc.lower() == "old.reddit.com":
+        parts = parts._replace(netloc="www.reddit.com")
+    return urlunsplit(parts)
+
 
 @register
 class RedditExtractor(Extractor):
@@ -111,6 +174,11 @@ class RedditExtractor(Extractor):
         return re.search(r"https?://(\w+\.)?reddit\.com(/|$)", url) is not None
 
     def extract(self, url: str, opts: FetchOptions) -> dict:
+        url = _to_www(url)
+        if not _is_post(url):
+            if opts.use_browser:
+                return self._extract_listing_dom(url, opts)
+            return self._extract_listing_json(url, opts)
         if opts.use_browser:
             return self._extract_dom(url, opts)
         return self._extract_json(url, opts)
@@ -193,9 +261,66 @@ class RedditExtractor(Extractor):
             "comments": comments[: opts.max_items],
         }
 
+    # -- listings: search results and feeds -------------------------------- #
+
+    def _extract_listing_dom(self, url: str, opts: FetchOptions) -> dict:
+        # Keep the query string here: it carries the search terms and sort.
+        data = render_execute(
+            url, self.resolve_browser(opts), _REDDIT_LISTING_SCRIPT,
+            ready_js=f"return document.querySelector('{_LISTING_SELECTOR}') != null;",
+            scroll_count_js=f"return document.querySelectorAll('{_LISTING_SELECTOR}').length;",
+            scroll_target=opts.max_items,
+        ) or {}
+        return self._listing(url, data.get("title"), data.get("posts") or [], opts)
+
+    def _extract_listing_json(self, url: str, opts: FetchOptions) -> dict:
+        parts = urlsplit(url)
+        json_url = urlunsplit(parts._replace(path=parts.path.rstrip("/") + "/.json"))
+        try:
+            raw, _ = http_get(json_url, accept="application/json")
+            children = json.loads(raw)["data"]["children"]
+        except Exception as e:
+            raise RuntimeError(
+                f"Reddit .json fetch failed ({e}); retry with --firefox/--profile"
+            ) from e
+        posts = []
+        for child in children:
+            if child.get("kind") != "t3":
+                continue
+            p = child["data"]
+            created = p.get("created_utc")
+            posts.append({
+                "title": p.get("title"),
+                "url": "https://www.reddit.com" + p.get("permalink", ""),
+                "subreddit": p.get("subreddit_name_prefixed"),
+                "author": p.get("author"),
+                "created": (datetime.fromtimestamp(created, timezone.utc).isoformat()
+                            if created is not None else None),
+                "score": p.get("score"),
+                "num_comments": p.get("num_comments"),
+                "link": None if p.get("is_self") else p.get("url_overridden_by_dest"),
+            })
+        return self._listing(url, None, posts, opts)
+
+    def _listing(self, url: str, title: str | None, posts: list, opts: FetchOptions) -> dict:
+        seen, unique = set(), []
+        for p in posts:
+            if p.get("url") and p["url"] not in seen:
+                seen.add(p["url"])
+                unique.append(p)
+        return {
+            "type": "reddit_listing",
+            "extractor": self.name,
+            "url": url,
+            "title": title,
+            "posts": unique[: opts.max_items],
+        }
+
     # -- rendering --------------------------------------------------------- #
 
     def render(self, data: dict) -> str:
+        if data.get("type") == "reddit_listing":
+            return self._render_listing(data)
         lines = [f"# {data['title']}\n"]
         lines.append(
             f"{data.get('subreddit')} | u/{data.get('author')} | "
@@ -213,4 +338,23 @@ class RedditExtractor(Extractor):
                 lines.append(f"\n{indent}u/{c.get('author')} ({c.get('score')}):")
                 for line in (c.get("body") or "").splitlines():
                     lines.append(f"{indent}{line}")
+        return "\n".join(lines)
+
+    def _render_listing(self, data: dict) -> str:
+        lines = [f"# {data.get('title') or 'Reddit'}\n", data["url"]]
+        if not data["posts"]:
+            lines.append("\nNo posts found.")
+        for i, p in enumerate(data["posts"], 1):
+            meta = [
+                p.get("subreddit"),
+                p.get("author") and f"u/{p['author']}",
+                p.get("created") and p["created"][:10],
+                p.get("score") is not None and f"score {p['score']}",
+                p.get("num_comments") is not None and f"{p['num_comments']} comments",
+            ]
+            lines.append(f"\n{i}. {p.get('title')}")
+            lines.append("   " + " | ".join(m for m in meta if m))
+            lines.append(f"   {p['url']}")
+            if p.get("link"):
+                lines.append(f"   Link: {p['link']}")
         return "\n".join(lines)
